@@ -36,3 +36,15 @@ export function getSpinTiming(spin: SpinInstruction, now: number) {
     finished: now >= start + spin.durationMs,
   };
 }
+/** The rim pegs the pointer ticks against; BeerWheel draws them at these angles. */
+export const RIM_PEGS = 32;
+/** Pegs that passed the top between two unwrapped rotations. Purely visual. */
+export function pegsPassed(from: number, to: number, pegs = RIM_PEGS): number {
+  const step = 360 / pegs;
+  return Math.abs(Math.floor(to / step) - Math.floor(from / step));
+}
+/** Continues `previous` with the shortest turn to `raw` (any angle, e.g. from a matrix). */
+export function unwrapRotation(previous: number, raw: number): number {
+  const delta = ((((raw - previous) % 360) + 540) % 360) - 180;
+  return previous + delta;
+}

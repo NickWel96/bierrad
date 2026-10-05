@@ -1,7 +1,8 @@
 import { useTheme } from "../Theme";
 import type { Participant, SpinInstruction } from "../domain/models";
 import { useWheelAnimation } from "../hooks/useWheelAnimation";
-import { idleRotation } from "../domain/spin";
+import { usePointerTicks } from "../hooks/usePointerTicks";
+import { idleRotation, RIM_PEGS } from "../domain/spin";
 export const colors = [
   "#f8bd37",
   "#eb794e",
@@ -33,6 +34,7 @@ export function BeerWheel({
     spin,
     idleRotation(wheelIndex, displayed.length),
   );
+  const pointer = usePointerTicks(ref, spinning);
   const step = 360 / displayed.length;
   const point = (angle: number, radius = 194) => [
     210 + radius * Math.sin((angle * Math.PI) / 180),
@@ -40,7 +42,7 @@ export function BeerWheel({
   ];
   return (
     <div className={`wheel-shell ${spinning ? "is-spinning" : ""}`}>
-      <div className="pointer" aria-hidden="true" />
+      <div ref={pointer} className="pointer" aria-hidden="true" />
       <svg
         ref={ref}
         viewBox="0 0 420 420"
@@ -87,8 +89,8 @@ export function BeerWheel({
             </g>
           );
         })}
-        {Array.from({ length: 32 }, (_, i) => {
-          const [x, y] = point((i * 360) / 32, 204);
+        {Array.from({ length: RIM_PEGS }, (_, i) => {
+          const [x, y] = point((i * 360) / RIM_PEGS, 204);
           return <circle key={i} cx={x} cy={y} r="2" fill="#f8df95" />;
         })}
       </svg>
