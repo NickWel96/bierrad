@@ -1,11 +1,20 @@
 import type { SpinInstruction } from "./models";
+/** Keeps the pointer visibly inside the slice: 8% of it, at least 2°, never past 45%. */
+export function landingMargin(count: number): number {
+  return Math.min(0.45, Math.max(0.08, (2 * count) / 360));
+}
+/**
+ * `position` is where the pointer stops inside the slice: 0 is its leading edge, 1 its
+ * trailing edge. Purely visual; the winner is already decided.
+ */
 export function landingRotation(
   current: number,
   index: number,
   count: number,
   rotations = 6,
+  position = 0.5,
 ): number {
-  const target = (360 - ((index + 0.5) * 360) / count) % 360;
+  const target = (360 - ((index + position) * 360) / count) % 360;
   return current + 360 * rotations + ((target - (current % 360) + 360) % 360);
 }
 /**

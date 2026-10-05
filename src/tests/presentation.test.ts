@@ -18,7 +18,7 @@ import {
   wheelCount,
 } from "../domain/drawEngine";
 import { getCapabilities } from "../domain/capabilities";
-import { idleRotation } from "../domain/spin";
+import { idleRotation, landingMargin } from "../domain/spin";
 import { addParticipant } from "../utils/participants";
 import type { Participant } from "../domain/models";
 
@@ -181,9 +181,10 @@ test("wheels rest at distinct deterministic slices without changing the landing"
   draw.spins.forEach((spin, i) => {
     assert.equal(spin.startRotation, idleRotation(i, people.length));
     const index = draw.participantIds.indexOf(spin.winnerId);
-    const alignment =
-      (spin.targetRotation + ((index + 0.5) * 360) / people.length) % 360;
-    assert.ok(Math.min(alignment, 360 - alignment) < 1e-8);
+    const step = 360 / people.length;
+    const position = (((-spin.targetRotation % 360) + 360) % 360) / step - index;
+    const margin = landingMargin(people.length);
+    assert.ok(position >= margin - 1e-9 && position <= 1 - margin + 1e-9);
   });
   assert.equal(idleRotation(0, 0), 0);
 });
