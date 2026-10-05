@@ -150,6 +150,7 @@ header {
   clip-path: polygon(0 0, 100% 0, 100% 43%, 50% 100%, 0 43%);
 }
 .is-spinning .pointer {
+  transform-origin: 50% 0;
   animation: tick 0.15s infinite alternate;
 }
 .wheel-hub {
@@ -448,9 +449,10 @@ footer b {
     transform: translateY(0);
   }
 }
+/* The wheel turns clockwise, so the pegs flick the tip to the right. */
 @keyframes tick {
   to {
-    transform: rotate(10deg);
+    transform: rotate(-10deg);
   }
 }
 
