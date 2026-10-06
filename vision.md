@@ -516,3 +516,5 @@ Slack blijft de ingang: een aparte Koffierad-app importeert uitsluitend `:coffee
 Het succes van Koffierad vraagt om een derde rad: **wie haalt het water voor de afdeling?** Waterrad heeft precies dezelfde features als Koffierad, met een fris blauw thema, 💧 als icoon en een eigen afsluiter: "Rondje gemeentepils van de zaak! Hydrateer ons trots." Het gebruikt bewust dezelfde Slack-app als koffie en telt uitsluitend `:droplet:`.
 
 In een aan Slack gekoppeld kanaal is er één vast rad voor beide: `/koffierad` of `/waterrad` vraagt een ronde aan, en het scherm dat altijd openstaat kleurt mee met de ronde. Er loopt één ronde tegelijk per kanaal, met samen hooguit 25 per dag.
+
+Het kanaal blijft rustig: elke ronde is daar één bericht dat meegroeit, van oproep naar "🏆 @naam haalt koffie". De @vermelding van de winnaar staat in de thread.

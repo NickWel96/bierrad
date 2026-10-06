@@ -189,6 +189,9 @@ export function nextDeadline(record: StoredSession): number {
   if (slack?.job?.status === "pending") times.push(slack.job.readyAt);
   if (slack?.job?.status === "posting")
     times.push(slack.job.attemptedAt! + 120000);
+  if (slack?.card?.status === "pending") times.push(slack.card.readyAt);
+  if (slack?.card?.status === "updating")
+    times.push(slack.card.attemptedAt! + 120000);
   const reminder = slack?.reminder;
   if (reminder?.status === "pending") times.push(reminder.readyAt);
   if (reminder?.status === "posting")

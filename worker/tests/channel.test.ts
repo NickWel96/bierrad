@@ -8,7 +8,7 @@ import {
   parseSlashCommand,
   verifySlackSignature,
 } from "../channel/slash";
-import { boundBody, callBody } from "../channel/messages";
+import { boundBody, callBody, settledCallBody } from "../channel/messages";
 import {
   channelRefreshAt,
   executeScheduledDraw,
@@ -17,7 +17,8 @@ import {
   START_DELAY_MS,
   type StoredSession,
 } from "../session";
-import { queueChannelNotice, resultBody } from "../slack/state";
+import { queueChannelNotice, queueResult, resultBody } from "../slack/state";
+import { createSession, startDraw } from "../../src/domain/drawEngine";
 import { SlackApiClient } from "../slack/api";
 import { SlackReactionParticipantSource } from "../slack/source";
 import { parseChannelInput, roundStartAt } from "../../shared/channel";
@@ -119,19 +120,22 @@ test("channel messages are fixed text with server-built links, never broadcast o
   const link = "https://example.test/#/live/one-two-three-four-five";
   const now = Date.parse("2026-10-05T08:00:00Z");
   const call = callBody("C00000001", link, now + 5 * 60000);
-  assert.match(call.text, /^☕ Koffieronde! .*\nOm 10:05 draait het Koffierad/);
+  // A bold title with the fixed start time, one action line and a quiet note.
+  assert.equal(call.text, "☕ Koffieronde om 10:05\nKlik op ☕ hieronder om mee te doen.\n" + link);
   assert.equal(call.unfurl_links, false);
   assert.equal(call.link_names, false);
   assert.equal("thread_ts" in call, false);
   assert.equal("reply_broadcast" in call, false);
-  assert.deepEqual(call.blocks[0].elements[0].elements[1], {
-    type: "link",
-    url: link,
-    text: "Kijk live mee",
+  const section = call.blocks[0].elements![0].elements;
+  assert.deepEqual(section[0], { type: "text", text: "☕ Koffieronde om 10:05", style: { bold: true } });
+  assert.deepEqual(section.at(-1), { type: "link", url: link, text: "Kijk live mee" });
+  assert.deepEqual(call.blocks[1], {
+    type: "context",
+    elements: [{ type: "plain_text", text: "Het Koffierad kiest één koffiehaler.", emoji: true }],
   });
   const water = callBody("C00000001", link, now + 60000, "water");
-  assert.match(water.text, /^💧 Waterronde! Klik op 💧 hieronder .*\nOm 10:01 draait het Waterrad en kiest het één waterhaler\./);
-  assert.doesNotMatch(water.text, /☕|koffie/i);
+  assert.match(water.text, /^💧 Waterronde om 10:01\nKlik op 💧 hieronder/);
+  assert.doesNotMatch(JSON.stringify(water), /☕|koffie/i);
   assert.equal(water.unfurl_links, false);
   assert.equal("reply_broadcast" in water, false);
   const bound = boundBody("C00000001", "https://example.test/#/koffie/abc");
@@ -139,41 +143,93 @@ test("channel messages are fixed text with server-built links, never broadcast o
   assert.match(bound.text, /\/waterrad/);
 });
 
-test("channel rounds close their thread when nobody joins or reactions cannot be read", () => {
+test("a settled round rewrites its own call: winner as mention, notices as fixed text, no link", () => {
+  const startAt = Date.parse("2026-10-05T08:05:00Z");
+  const won = settledCallBody("C00000001", "1234567890.123456", startAt, "coffee", {
+    kind: "winner",
+    names: ["<!channel> Nick"],
+    mentionIds: ["U00000001"],
+    participants: 7,
+  });
+  assert.equal(won.channel, "C00000001");
+  assert.equal(won.ts, "1234567890.123456");
+  assert.equal("thread_ts" in won, false);
+  assert.equal("reply_broadcast" in won, false);
+  assert.equal(won.parse, "none");
+  // The fallback text is escaped; the block mentions only the frozen identity.
+  assert.equal(won.text, "☕ Koffieronde om 10:05\n🏆 &lt;!channel&gt; Nick haalt koffie");
+  assert.deepEqual(won.blocks[0].elements![0].elements.slice(2), [
+    { type: "text", text: "🏆 " },
+    { type: "user", user_id: "U00000001" },
+    { type: "text", text: " haalt koffie" },
+  ]);
+  assert.equal(won.blocks[1].elements![0].text, "7 deden mee");
+  assert.ok(!JSON.stringify(won).includes("example.test"));
+  // Without a valid identity the name stays literal text.
+  const plain = settledCallBody("C00000001", "1234567890.123456", startAt, "water", {
+    kind: "winner",
+    names: ["Bob"],
+    mentionIds: [null],
+    participants: 1,
+  });
+  assert.deepEqual(plain.blocks[0].elements![0].elements.slice(2), [
+    { type: "text", text: "🏆 " },
+    { type: "text", text: "Bob" },
+    { type: "text", text: " haalt water" },
+  ]);
+  assert.equal(plain.blocks[1].elements![0].text, "1 deed mee");
+  const empty = settledCallBody("C00000001", "1234567890.123456", startAt, "water", { kind: "empty" });
+  assert.equal(empty.text, "💧 Waterronde om 10:05\nNiemand deed mee, dus het rad bleef stil. Dan maar zelf tappen!");
+  assert.equal(empty.blocks.length, 1);
+  const unreadable = settledCallBody("C00000001", "1234567890.123456", startAt, "coffee", { kind: "unreadable" });
+  assert.match(unreadable.text, /^☕ Koffieronde om 10:05\nHet Koffierad kon de reacties niet lezen/);
+});
+
+test("channel rounds settle in their call: a card instead of thread notices or broadcasts", () => {
   const now = Date.parse("2026-10-05T08:00:00Z");
+  const startAt = now + 300000;
   const source = { channelId: "C00000001", parentMessageTs: "1234567890.123456", reactionName: "coffee" as const };
   const round = (): StoredSession => {
     const r = newSession("host", "viewer", now, "coffee");
     r.preferredCount = 1;
-    r.scheduledDraw = { startAt: new Date(now + 300000).toISOString(), status: "refreshing" };
+    r.scheduledDraw = { startAt: new Date(startAt).toISOString(), status: "refreshing" };
     r.slack = { grantHash: "slack-channel", mapping: {}, source, channelRound: true, nextImportAt: now + 60000 };
     return r;
   };
   let r = round();
   executeScheduledDraw(r, now, true);
-  assert.equal(r.slack!.job?.notice, "empty");
-  assert.match(resultBody(r.slack!.job!).text, /Niemand deed mee/);
-  assert.equal(resultBody(r.slack!.job!).reply_broadcast, false);
+  assert.equal(r.slack!.job, undefined);
+  assert.deepEqual(r.slack!.card, { kind: "empty", startAt, status: "pending", readyAt: now, attempts: 0 });
+  assert.equal(nextDeadline(r), now);
   r = round();
   executeScheduledDraw(r, now, false);
-  assert.equal(r.slack!.job?.notice, "unreadable");
-  // Ordinary Slack sessions keep their old behaviour: no notice at all.
+  assert.equal(r.slack!.card?.kind, "unreadable");
+  // Ordinary Slack sessions keep their old behaviour: no notice and no card.
   r = round();
   delete r.slack!.channelRound;
   executeScheduledDraw(r, now, true);
   assert.equal(r.slack!.job, undefined);
+  assert.equal(r.slack!.card, undefined);
   queueChannelNotice(r, "empty", now);
-  assert.equal(r.slack!.job, undefined);
-  // A water round's notices speak of water, from its frozen reaction.
+  assert.equal(r.slack!.card, undefined);
+  // A drawn round: the thread result is never broadcast and the call gets the winner.
   r = round();
-  r.variant = "water";
-  r.slack!.source = { ...source, reactionName: "droplet" };
-  executeScheduledDraw(r, now, true);
-  assert.equal(resultBody(r.slack!.job!).text, "💧 Niemand deed mee aan deze waterronde, dus het rad bleef stil. Dan maar zelf tappen!");
-  r = round();
-  r.slack!.source = { ...source, reactionName: "droplet" };
-  executeScheduledDraw(r, now, false);
-  assert.match(resultBody(r.slack!.job!).text, /^💧 Het Waterrad kon de reacties niet lezen/);
+  r.slack!.mapping = { U00000001: "p1", U00000002: "p2" };
+  r.session = startDraw(createSession("s1", [{ id: "p1", name: "Alice" }, { id: "p2", name: "Bob" }], 1), { id: "d1", startAt: new Date(now + 4000).toISOString() });
+  queueResult(r);
+  const job = r.slack!.job!;
+  assert.equal(resultBody(job).reply_broadcast, false);
+  const card = r.slack!.card!;
+  assert.equal(card.kind, "winner");
+  assert.equal(card.startAt, startAt);
+  assert.equal(card.readyAt, job.readyAt);
+  assert.equal(card.kind === "winner" && card.participants, 2);
+  assert.deepEqual(card.kind === "winner" && card.mentionIds, job.mentionIds);
+  // Bierrad sessions (no channel round) get no card.
+  delete r.slack!.card;
+  delete r.slack!.channelRound;
+  queueResult(r);
+  assert.equal(r.slack!.card, undefined);
 });
 
 test("channel rounds refresh themselves, but never close to the final check", () => {
@@ -233,6 +289,8 @@ test(
     let postMode = "success";
     let ts = 1234567890100000;
     const posts: Record<string, unknown>[] = [];
+    const updates: Record<string, unknown>[] = [];
+    let updateMode = "success";
     const reactionsAdded: Record<string, unknown>[] = [];
     const userLookups: string[] = [];
     const reactors = ["UBOT00001", "U00000001", "U00000002"];
@@ -249,7 +307,7 @@ test(
       edit(fn) { const r = JSON.parse(this.ctx.storage.sql.exec('SELECT value FROM session WHERE singleton = 1').one().value); fn(r); this.ctx.storage.sql.exec('UPDATE session SET value = ? WHERE singleton = 1', JSON.stringify(r)); }
       stored() { return this.ctx.storage.sql.exec('SELECT value FROM session WHERE singleton = 1').one().value; }
       async due() { this.edit(r => { r.scheduledDraw.startAt = new Date(Date.now() + 4000).toISOString(); }); return this.alarm(); }
-      async postNow() { this.edit(r => { r.slack.job.readyAt = 0; }); return this.alarm(); }
+      async postNow() { this.edit(r => { if (r.slack.job) r.slack.job.readyAt = 0; if (r.slack.card) r.slack.card.readyAt = Date.now() - 1; }); return this.alarm(); }
       land() { this.edit(r => { const d = r.session.activeDraw; const end = Math.max(...d.spins.map(s => Date.parse(s.startAt) + s.durationMs)); const shift = end - Date.now() + 1000; const move = t => new Date(Date.parse(t) - shift).toISOString(); d.startAt = move(d.startAt); for (const s of d.spins) s.startAt = move(s.startAt); }); }
     }
     export class TestChannel extends ChannelWheel {
@@ -325,6 +383,12 @@ test(
                     ],
                   },
                 });
+              if (path === "chat.update") {
+                const body = (await req.json()) as Record<string, unknown>;
+                updates.push(body);
+                if (updateMode === "reject") return Response.json({ ok: false, error: "message_not_found" });
+                return Response.json({ ok: true, channel: body.channel, ts: body.ts });
+              }
               assert.equal(path, "chat.postMessage");
               const body = (await req.json()) as Record<string, unknown>;
               posts.push(body);
@@ -504,10 +568,21 @@ test(
       await session.postNow();
       const result = posts.at(-1)!;
       assert.equal(result.thread_ts, callTs);
-      // The winner is also sent to the channel, as a thread reply ("Also send to").
-      assert.equal(result.reply_broadcast, true);
+      // The winner stays in the thread; the channel sees it in the updated call.
+      assert.equal(result.reply_broadcast, false);
       assert.match(String(result.text), /Jij mag koffie halen!/);
-      assert.ok(/"user_id":"U0000000[12]"/.test(JSON.stringify(result.blocks)));
+      const winner = /"user_id":"(U0000000[12])"/.exec(JSON.stringify(result.blocks))![1];
+      assert.equal(updates.length, 1);
+      const settled = updates[0];
+      assert.equal(settled.channel, "C00000001");
+      assert.equal(settled.ts, callTs);
+      assert.equal(settled.thread_ts, undefined);
+      assert.ok(JSON.stringify(settled.blocks).includes(`"user_id":"${winner}"`));
+      assert.ok(JSON.stringify(settled.blocks).includes('"text":"2 deden mee"'));
+      // The rewritten call carries no link or capability any more.
+      assert.ok(!JSON.stringify(settled).includes(watcher));
+      assert.ok(!JSON.stringify(settled).includes("http"));
+      assert.match(await session.stored(), /"card":\{[^}]*"status":"updated"/);
 
       // While the wheel still spins, the round keeps blocking the next one.
       assert.equal((await api(requester, { type: "requestRound", minutes: 2 })).status, 409);
@@ -541,7 +616,7 @@ test(
       assert.equal(watered.status, 200);
       assert.equal(await watered.text(), "");
       const waterCall = posts.at(-1)!;
-      assert.match(String(waterCall.text), /^💧 Waterronde!/);
+      assert.match(String(waterCall.text), /^💧 Waterronde om \d\d:\d\d\n/);
       assert.ok(JSON.stringify(waterCall.blocks).includes(`#/koffie/${watcher}`));
       assert.equal(reactionsAdded.at(-1)!.name, "droplet");
       const waterStatus = ((await status(requester)) as { status: { variant: string; round: { variant: string; spectatorCapability: string; active: boolean } } }).status;
@@ -568,9 +643,18 @@ test(
       await waterSession.due();
       // Only the 💧 drinker joins; ☕ reactors and the bot never do.
       assert.deepEqual((await waterSnapshot()).participants.map((p) => p.name), ["Bob"]);
+      // A rejected update is tried again, never more than three times in total.
+      updateMode = "reject";
       await waterSession.postNow();
       const waterResult = posts.at(-1)!;
-      assert.equal(waterResult.reply_broadcast, true);
+      assert.equal(waterResult.reply_broadcast, false);
+      assert.equal(updates.length, 2);
+      updateMode = "success";
+      await waterSession.postNow();
+      assert.equal(updates.length, 3);
+      assert.match(String(updates[2].text), /^💧 Waterronde om \d\d:\d\d\n🏆 Bob haalt water$/);
+      await waterSession.postNow();
+      assert.equal(updates.length, 3);
       assert.match(String(waterResult.text), /^💧 .*Jij mag water halen!/s);
       assert.ok(JSON.stringify(waterResult.blocks).includes('"user_id":"U00000003"'));
       await waterSession.land();
