@@ -482,7 +482,7 @@ test(
       assert.match(watcher, /^[a-z]{2,8}(?:-[a-z]{2,8}){4}$/);
       assert.deepEqual(
         { ...initial, expiresAt: undefined, viewerCapability: undefined },
-        { role: "requester", variant: "coffee", defaultMinutes: 5, roundsLeft: 25, expiresAt: undefined, viewerCapability: undefined },
+        { role: "requester", variant: "coffee", defaultMinutes: 5, roundsLeft: 25, expiresAt: undefined, viewerCapability: undefined, reviews: { enabled: true, minutes: 15 } },
       );
       // The confirmation carries only the request link, not the word link.
       assert.ok(!JSON.stringify(posts).includes(watcher));
@@ -498,6 +498,9 @@ test(
         assert.equal((await api(requester, command)).status, 400, JSON.stringify(command));
       assert.equal((await api(`${admin.split(".")[0]}.${randomHex()}`)).status, 404);
       assert.equal((await api("one-two-three-four-five")).status, 404);
+      // Reviews are on by default; this suite covers rounds without them
+      // (reviews-live.test.ts covers the rest).
+      await status(admin, { type: "setReviews", enabled: false, minutes: 15 });
 
       // A round from the link: one call message, a prefilled ☕, a viewer-only session.
       const before = posts.length;

@@ -18,6 +18,10 @@ import {
   type ChannelVariant,
 } from "../../shared/channel";
 import { themes } from "../../shared/variant";
+import {
+  DEFAULT_REVIEW_SETTINGS,
+  REVIEW_MINUTE_CHOICES,
+} from "../../shared/reviews";
 import { VariantContext } from "../Theme";
 import {
   channelBindUrl,
@@ -25,8 +29,11 @@ import {
   channelLink,
   channelRequest,
   channelViewLink,
+  channelViewRoute,
   type ChannelBindFailure,
+  type MemberLoginFailure,
 } from "../sessions/ChannelClient";
+import { ReviewBallotCard, ReviewJoin, ReviewThanks } from "./ReviewBallot";
 import { configuredApiUrl } from "../sessions/liveNavigation";
 import { RemoteSessionController } from "../sessions/RemoteSessionController";
 import App from "../App";
@@ -140,6 +147,32 @@ export function ChannelBindPage({ failure }: { failure?: ChannelBindFailure }) {
   );
 }
 
+const memberFailures: Record<MemberLoginFailure, string> = {
+  denied: "Inloggen bij Slack is geannuleerd.",
+  forbidden:
+    "Alleen volwaardige leden van de workspace kunnen inloggen om te beoordelen. Meekijken kan altijd.",
+  expired:
+    "Het inloggen duurde te lang, is in een ander tabblad gestart of de kanaallink is vervangen.",
+  unavailable: "Slack is nu niet bereikbaar. Probeer het zo opnieuw.",
+  busy: "Er loggen nu veel mensen tegelijk in. Probeer over een minuut opnieuw.",
+};
+/** Where a failed personal login lands; it has no channel link to go back to. */
+export function ChannelMemberFailurePage({
+  failure,
+}: {
+  failure: MemberLoginFailure;
+}) {
+  return (
+    <ChannelTheme variant="coffee" title="Inloggen mislukt">
+      <div className="unavailable channel-page">
+        <h1>☕ Inloggen lukte niet</h1>
+        <p role="alert">{memberFailures[failure]}</p>
+        <p>Open de ronde opnieuw via de oproep in Slack en probeer het nog eens.</p>
+      </div>
+    </ChannelTheme>
+  );
+}
+
 /** Request a round (everyone with the link) and, for admins, manage the binding. */
 export function ChannelWheelPage({
   capability,
@@ -153,14 +186,21 @@ export function ChannelWheelPage({
   const [minutes, setMinutes] = useState<number>();
   const [pending, setPending] = useState(false);
   const [notice, setNotice] = useState("");
-  const [gone, setGone] = useState(false);
+  const [gone, setGone] = useState<false | "gone" | "loggedOut">(false);
+  const [withReviews, setWithReviews] = useState<boolean>();
+  /** A ballot put aside with "Later"; it stays one click away. */
+  const [later, setLater] = useState<string>();
   const live = useRoundController(api, status?.round?.spectatorCapability);
   const run = useCallback(
     async (command?: ChannelCommand) => {
       if (!api) return;
       const result = await channelRequest(api, capability, command);
       if (result.type === "unbound") {
-        setGone(true);
+        setGone("gone");
+        return result;
+      }
+      if (result.type === "loggedOut") {
+        setGone("loggedOut");
         return result;
       }
       if (result.type === "view") throw new ChannelApiError("unavailable");
@@ -175,7 +215,7 @@ export function ChannelWheelPage({
       void run().catch((error: Error) => {
         if (!active) return;
         setNotice(error.message);
-        if ((error as { code?: string }).code === "unavailable") setGone(true);
+        if ((error as { code?: string }).code === "unavailable") setGone("gone");
       });
     refresh();
     // Picks up rounds started elsewhere (for example with /koffierad or /waterrad).
@@ -187,6 +227,25 @@ export function ChannelWheelPage({
       window.removeEventListener("focus", refresh);
     };
   }, [run]);
+  // Voting opens a minute after the finale: a personal link asks for its
+  // ballot right then instead of waiting for the next poll, and once more.
+  const isMember = status?.role === "member";
+  useEffect(() => {
+    if (!live || !isMember) return;
+    let finished = live.getSnapshot().session.state === "finished";
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const unsubscribe = live.subscribe(() => {
+      const now = live.getSnapshot().session.state === "finished";
+      if (now && !finished)
+        for (const delay of [61000, 66000])
+          timers.push(setTimeout(() => void run().catch(() => {}), delay));
+      finished = now;
+    });
+    return () => {
+      unsubscribe();
+      timers.forEach(clearTimeout);
+    };
+  }, [live, isMember, run]);
   async function act(command: ChannelCommand, done?: string) {
     setPending(true);
     setNotice("");
@@ -207,11 +266,17 @@ export function ChannelWheelPage({
     return (
       <ChannelTheme variant={status?.variant ?? "coffee"}>
         <div className="unavailable channel-page">
-          <h1>☕ Dit Koffierad is niet beschikbaar.</h1>
+          <h1>
+            {gone === "loggedOut"
+              ? "☕ Je bent uitgelogd."
+              : "☕ Dit Koffierad is niet beschikbaar."}
+          </h1>
           <p>
-            {gone
-              ? "De koppeling is opgeheven of deze link is vervangen. Vraag de beheerder van het kanaal om de nieuwe link."
-              : "Live koffie- en waterrondes zijn hier nog niet ingesteld."}
+            {gone === "loggedOut"
+              ? "Deze persoonlijke link werkt niet meer. Open een ronde via de oproep in Slack om opnieuw in te loggen."
+              : gone
+                ? "De koppeling is opgeheven of deze link is vervangen. Vraag de beheerder van het kanaal om de nieuwe link."
+                : "Live koffie- en waterrondes zijn hier nog niet ingesteld."}
           </p>
           <a href="#/coffee">Open een lokaal Koffierad</a>
         </div>
@@ -230,8 +295,83 @@ export function ChannelWheelPage({
   const choices = [
     ...new Set([...ROUND_MINUTE_CHOICES, status.defaultMinutes]),
   ].sort((a, b) => a - b);
+  const reviews = status.reviews ?? DEFAULT_REVIEW_SETTINGS;
+  const reviewed = withReviews ?? reviews.enabled;
   const request = (kind: ChannelVariant) =>
-    void act({ type: "requestRound", minutes: chosen, variant: kind });
+    void act({
+      type: "requestRound",
+      minutes: chosen,
+      variant: kind,
+      reviews: reviewed,
+    });
+  const reviewToggle = (
+    <label className="review-toggle">
+      <input
+        type="checkbox"
+        checked={reviewed}
+        disabled={pending}
+        onChange={(e) => setWithReviews(e.target.checked)}
+      />{" "}
+      ⭐ Met reviews
+    </label>
+  );
+  const member = status.role === "member";
+  const ballot = status.member?.ballot;
+  const submit = async (submission: { scores: number[]; texts: string[] }) => {
+    await run({ type: "review", drawId: ballot!.drawId, ...submission });
+  };
+  // Personal link: who you are (only to yourself), and your own ballot.
+  const memberBar = member && (
+    <div className="member-bar">
+      <span>✓ Ingelogd met Slack</span>
+      {status.round?.active && status.member?.participating !== undefined && (
+        <span className="member-chip" data-in={status.member.participating}>
+          {status.member.participating
+            ? "Jij doet mee"
+            : `Klik ${themes[variant].icon} in Slack om mee te doen`}
+        </span>
+      )}
+      {ballot?.submitted && <ReviewThanks closesAt={ballot.closesAt} />}
+      {ballot && !ballot.submitted && later === ballot.drawId && (
+        <button className="primary" onClick={() => setLater(undefined)}>
+          ⭐ Beoordeel de haler
+        </button>
+      )}
+      <button
+        className="link-button"
+        disabled={pending}
+        onClick={() => void act({ type: "logout" })}
+      >
+        Uitloggen
+      </button>
+      <small className="member-hint">
+        Dit is jouw persoonlijke link, 30 dagen geldig: zet hem in je
+        bladwijzers en deel hem niet.
+      </small>
+    </div>
+  );
+  const ballotCard = member && ballot && !ballot.submitted && later !== ballot.drawId && (
+    <ReviewBallotCard
+      key={ballot.drawId}
+      ballot={ballot}
+      variant={variant}
+      channelName={status.channelName}
+      onSubmit={submit}
+      onLater={() => setLater(ballot.drawId)}
+    />
+  );
+  // Anyone holding the channel link may log in to review, or just watch.
+  const join = !member && api && (reviews.enabled || status.round?.reviews) && (
+    <ReviewJoin
+      apiUrl={api}
+      capability={capability}
+      viewLink={
+        status.viewerCapability
+          ? channelViewRoute(status.viewerCapability)
+          : undefined
+      }
+    />
+  );
   const admin = status.role === "admin" && (
     <ChannelAdmin
       status={status}
@@ -261,6 +401,7 @@ export function ChannelWheelPage({
               </span>
             ) : (
               <span className="channel-strip-request">
+                {reviewToggle}
                 <label>
                   Nieuwe ronde over{" "}
                   <select
@@ -287,7 +428,10 @@ export function ChannelWheelPage({
                 ))}
               </span>
             )}
+            {!member && <ReviewProgressNote controller={live} />}
             {notice && <small role="status">{notice}</small>}
+            {memberBar}
+            {join}
             {status.viewerCapability && (
               <small className="channel-view-link">
                 Op een ander scherm meekijken:{" "}
@@ -295,6 +439,7 @@ export function ChannelWheelPage({
               </small>
             )}
           </div>
+          {ballotCard && <div className="review-overlay">{ballotCard}</div>}
           <ChannelLive key={status.round.spectatorCapability} controller={live} />
         </div>
         {admin && <div className="unavailable channel-page">{admin}</div>}
@@ -304,6 +449,8 @@ export function ChannelWheelPage({
     <ChannelTheme variant={variant}>
       <div className="unavailable channel-page">
         <span className="friday-badge">{channelTitle(variant, status.channelName)}</span>
+        {memberBar}
+        {ballotCard}
         <h1>Tijd voor koffie of water?</h1>
         <section className="channel-request">
           <p>
@@ -324,6 +471,7 @@ export function ChannelWheelPage({
               </button>
             ))}
           </fieldset>
+          {reviewToggle}
           {channelVariants.map((kind) => (
             <button
               key={kind}
@@ -340,6 +488,7 @@ export function ChannelWheelPage({
           )}
         </section>
         {notice && <p role="status">{notice}</p>}
+        {join}
         <p className="helper">
           Liever vanuit Slack? Typ <code>/koffierad</code> of{" "}
           <code>/waterrad</code> in het kanaal, met bijvoorbeeld{" "}
@@ -437,6 +586,7 @@ export function ChannelViewPage({ capability }: { capability: string }) {
                 "Typ /koffierad of /waterrad in het kanaal voor een nieuwe ronde."
               )}
             </span>
+            <ReviewProgressNote controller={live} />
           </div>
           <ChannelLive key={round.spectatorCapability} controller={live} />
         </div>
@@ -492,6 +642,24 @@ function ServerTimeLeft({
     () => controller?.getSnapshot().clockOffsetMs ?? 0,
   );
   return <TimeLeft startAt={startAt} offsetMs={offsetMs} />;
+}
+/** Shared screens only: how many have voted, never who. */
+function ReviewProgressNote({
+  controller,
+}: {
+  controller?: RemoteSessionController;
+}) {
+  const review = useSyncExternalStore(
+    controller?.subscribe ?? noSubscription,
+    () => controller?.getSnapshot().live?.review,
+  );
+  if (!review) return null;
+  return (
+    <small className="review-progress" aria-live="polite">
+      ⭐ {review.voted} van {review.eligible} gestemd · tot{" "}
+      {clock.format(Date.parse(review.closesAt))}
+    </small>
+  );
 }
 /** The live wheel of one round, as a spectator; keyed per round so it remounts. */
 function ChannelLive({ controller }: { controller?: RemoteSessionController }) {
@@ -563,12 +731,53 @@ function ChannelAdmin({
           ))}
         </select>
       </label>
+      <label>
+        Reviews standaard aan{" "}
+        <input
+          type="checkbox"
+          checked={(status.reviews ?? DEFAULT_REVIEW_SETTINGS).enabled}
+          disabled={pending}
+          onChange={(e) =>
+            void act(
+              {
+                type: "setReviews",
+                enabled: e.target.checked,
+                minutes: (status.reviews ?? DEFAULT_REVIEW_SETTINGS).minutes,
+              },
+              "Reviewinstelling opgeslagen.",
+            )
+          }
+        />
+      </label>
+      <label>
+        Stemmen kan
+        <select
+          value={(status.reviews ?? DEFAULT_REVIEW_SETTINGS).minutes}
+          disabled={pending}
+          onChange={(e) =>
+            void act(
+              {
+                type: "setReviews",
+                enabled: (status.reviews ?? DEFAULT_REVIEW_SETTINGS).enabled,
+                minutes: Number(e.target.value),
+              },
+              "Reviewinstelling opgeslagen.",
+            )
+          }
+        >
+          {REVIEW_MINUTE_CHOICES.map((m) => (
+            <option key={m} value={m}>
+              {m} minuten na de trekking
+            </option>
+          ))}
+        </select>
+      </label>
       <button
         disabled={pending}
         onClick={() => {
           if (
             window.confirm(
-              "Een nieuwe kanaallink maken? De oude link en de oude meekijklink werken dan niet meer, ook niet als ze in Slack staan.",
+              "Een nieuwe kanaallink maken? De oude link, de oude meekijklink en alle persoonlijke links werken dan niet meer, ook niet als ze in Slack staan.",
             )
           )
             void act({ type: "rotateRequestLink" }, "Nieuwe kanaallink gemaakt.");

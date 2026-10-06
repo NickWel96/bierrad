@@ -22,7 +22,7 @@ import {
   hashSecret,
   wordLocator,
 } from "./auth";
-import { frontend, json, readBody, redirect } from "./http";
+import { frontend, json, readBody, readFormBody, redirect } from "./http";
 import { RequestError } from "./session";
 import { channelCopy, validRoundMinutes } from "../shared/channel";
 import { channelLocator, channelViewerLocator } from "./channel/wheel";
@@ -107,19 +107,65 @@ async function slackAuth(
   const binding =
     !!bindStart ||
     (!start && url.pathname === "/auth/slack/callback" && !!pending?.channelId);
+  // A personal channel link: started by a form POST from the channel page.
+  const memberStart = url.pathname === "/auth/slack/member";
+  const member =
+    memberStart ||
+    (!start && url.pathname === "/auth/slack/callback" && !!pending?.memberLocator);
+  if (memberStart) variant = "coffee";
   const clear = loginCookie("", 0);
   const fail = (reason: string) =>
     redirect(
-      binding
-        ? `${app.href}#/koffie-koppelen/${reason}`
-        : `${app.href}#/${variant === "beer" ? "" : `${variant}-`}slack/${reason}`,
+      member
+        ? `${app.href}#/koffie-login/${reason}`
+        : binding
+          ? `${app.href}#/koffie-koppelen/${reason}`
+          : `${app.href}#/${variant === "beer" ? "" : `${variant}-`}slack/${reason}`,
       clear,
     );
   try {
-    if (request.method !== "GET") return json({ code: "invalid" }, 405);
+    if (request.method !== (memberStart ? "POST" : "GET"))
+      return json({ code: "invalid" }, 405);
     const ip = request.headers.get("CF-Connecting-IP") ?? "local";
     if (!(await env.REQUEST_LIMIT.limit({ key: ip })).success)
       return fail("busy");
+    if (memberStart) {
+      // The channel link travels only in a small form body from an allowed
+      // origin, never in a URL; it proves the person already holds it.
+      if (
+        url.search ||
+        !env.ALLOWED_ORIGINS.split(",").includes(
+          request.headers.get("Origin") ?? "",
+        ) ||
+        !request.headers
+          .get("Content-Type")
+          ?.startsWith("application/x-www-form-urlencoded")
+      )
+        return fail("expired");
+      const form = new URLSearchParams(await readFormBody(request, 1024));
+      const capability = parseCapability(form.get("capability"));
+      if (
+        [...form.keys()].length !== 1 ||
+        form.getAll("capability").length !== 1 ||
+        !capability?.locator
+      )
+        return fail("expired");
+      if (
+        !(await env.CHANNELS.getByName(capability.locator).memberLoginAllowed(
+          capability.secret,
+        ))
+      )
+        return fail("expired");
+      const login = beginLogin(
+        slackEnvironment(env, "coffee"),
+        "coffee",
+        callback,
+        Date.now(),
+        undefined,
+        capability.locator,
+      );
+      return redirect(login.location, login.cookie);
+    }
     if (start || bindStart) {
       if (url.search) return fail("expired");
       const login = beginLogin(
@@ -135,13 +181,26 @@ async function slackAuth(
     if (!pending) return fail("expired");
     variant = pending.variant;
     // Before any Slack call: failed attempts also spend the creation budget.
-    if (!(await creationAllowed(env, ip))) return fail("busy");
+    // Personal logins create nothing; their channel bounds them per minute.
+    if (!pending.memberLocator && !(await creationAllowed(env, ip)))
+      return fail("busy");
     const workspace = await completeLogin(
       slackEnvironment(env, variant),
       pending,
       url.searchParams,
       callback,
     );
+    if (pending.memberLocator) {
+      let personal: string;
+      try {
+        personal = await env.CHANNELS.getByName(
+          pending.memberLocator,
+        ).addMember(workspace.userId, workspace.teamId);
+      } catch {
+        return fail("expired");
+      }
+      return redirect(`${app.href}#/koffie/${personal}`, clear);
+    }
     if (pending.channelId) {
       const locator = await channelLocator(pending.channelId);
       const admin = randomHex(),

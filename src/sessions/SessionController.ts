@@ -14,6 +14,8 @@ export interface LiveInfo {
   expiresAt?: string;
   slack?: import("../../shared/protocol").SlackHostStatus;
   scheduledDraw?: import("../../shared/protocol").ScheduledDraw;
+  /** Counts only, while the round can be reviewed. */
+  review?: import("../../shared/reviews").ReviewProgress;
 }
 export interface SessionSnapshot {
   readonly session: BeerWheelSession;

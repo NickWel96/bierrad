@@ -518,3 +518,7 @@ Het succes van Koffierad vraagt om een derde rad: **wie haalt het water voor de 
 In een aan Slack gekoppeld kanaal is er één vast rad voor beide: `/koffierad` of `/waterrad` vraagt een ronde aan, en het scherm dat altijd openstaat kleurt mee met de ronde. Er loopt één ronde tegelijk per kanaal, met samen hooguit 25 per dag.
 
 Het kanaal blijft rustig: elke ronde is daar één bericht dat meegroeit, van oproep naar "🏆 @naam haalt koffie". De @vermelding van de winnaar staat in de thread.
+
+## Reviews voor de haler — uitbreiding 2026-10-06
+
+Na een ronde mogen de deelnemers de haler een cijfer geven: 1–5 sterren, met optioneel een korte anonieme tekst, net als een review van een verblijf. Speelse labels per drankje ("Slootwater" tot "Barista-niveau") maken het een grap en geen beoordelingsgesprek. Je logt één keer in met Slack en bewaart je persoonlijke link; daarmee kijk je mee en stem je in elke ronde. Je stemt alleen als je meedeed, één keer, en nooit op jezelf. Als iedereen gestemd heeft of de tijd om is, verschijnen de reviews anoniem in de thread en krijgt de oproep zijn sterren. Daarna is alles vergeten: geen historie, geen gemiddelden over weken. Gedeelde schermen tonen alleen hoeveel mensen gestemd hebben. Bierrad krijgt dit later ook.

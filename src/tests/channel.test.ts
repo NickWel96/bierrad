@@ -29,7 +29,15 @@ test("channel routes accept only exact fragments with hex or 5-word capabilities
     capability: cap,
     requestCapability: other,
   });
+  // A failed personal login lands without any link.
+  assert.deepEqual(parseChannelRoute("#/koffie-login/forbidden"), {
+    page: "memberFailure",
+    failure: "forbidden",
+  });
   for (const hash of [
+    "#/koffie-login",
+    "#/koffie-login/not_in_channel",
+    `#/koffie-login/${cap}`,
     "#/koffie-koppelen/other",
     `#/koffie/${cap}/extra`,
     "#/koffie/aap-beer-dak-fiets",

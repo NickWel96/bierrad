@@ -1,5 +1,5 @@
 import { isChannelVariant, type ChannelVariant } from "../shared/channel";
-import { settledCallBody } from "./channel/messages";
+import { reviewBody, settledCallBody } from "./channel/messages";
 import { themes, type WheelVariant } from "../shared/variant";
 import { SlackApiClient, SlackError } from "./slack/api";
 import {
@@ -9,6 +9,7 @@ import {
 } from "./slack/source";
 import {
   reconcile,
+  postMessage,
   postResult,
   updateMessage,
   MAX_CARD_ATTEMPTS,
@@ -25,7 +26,21 @@ import {
 } from "./slack/access";
 import { getCapabilities } from "../src/domain/capabilities";
 import { DurableObject } from "cloudflare:workers";
-import { equalHash, hashSecret, parseCapability, randomHex } from "./auth";
+import {
+  equalHash,
+  hashSecret,
+  parseCapability,
+  pseudonym,
+  randomHex,
+} from "./auth";
+import {
+  closeReview,
+  openReview,
+  reviewBallot,
+  settleReviewJob,
+  submitReview,
+} from "./reviews";
+import type { ReviewBallot } from "../shared/reviews";
 import { createSession } from "../src/domain/drawEngine";
 import { SCHEDULE_RETENTION_MS } from "../shared/retention";
 import {
@@ -101,6 +116,7 @@ export class LiveSession extends DurableObject<Env & SlackSecrets> {
     startAt: number,
     excludeUserIds: string[],
     variant: ChannelVariant = "coffee",
+    review?: { minutes: number; key: string; link: string },
   ): Promise<void> {
     const hostHash = await hashSecret(randomHex());
     if (this.read()) throw new Error("unavailable");
@@ -126,6 +142,7 @@ export class LiveSession extends DurableObject<Env & SlackSecrets> {
       // The first read waits a minute: right after posting only the bot reacted.
       nextImportAt: now + 60000,
     };
+    if (review) record.review = { ...review, status: "waiting" };
     this.save(record);
     await this.ctx.storage.setAlarm(nextDeadline(record));
   }
@@ -457,6 +474,7 @@ export class LiveSession extends DurableObject<Env & SlackSecrets> {
     await this.processChannelRefresh();
     await this.processScheduledDraw();
     await this.processSlackResult();
+    await this.processReview();
     await this.processCallCard();
     const latest = this.read();
     if (latest && Date.now() < latest.expiresAt)
@@ -647,6 +665,70 @@ export class LiveSession extends DurableObject<Env & SlackSecrets> {
     executeScheduledDraw(record, Date.now(), ready && authorized);
     this.save(record);
     this.broadcast(record);
+    await this.openRoundReview();
+  }
+  /** Freezes who may review whom, under pseudonyms, as the draw starts. */
+  private async openRoundReview() {
+    let record = this.read();
+    const key = record?.review?.key;
+    if (!record || record.review?.status !== "waiting" || !key) return;
+    if (!record.session.activeDraw) {
+      // Skipped round: nothing to review, and the key goes now.
+      delete record.review;
+      this.save(record);
+      return;
+    }
+    const ids = Object.keys(record.slack?.mapping ?? {});
+    const pseudonyms = new Map(
+      await Promise.all(
+        ids.map(async (id) => [id, await pseudonym(key, id)] as const),
+      ),
+    );
+    record = this.read();
+    if (!record || record.review?.status !== "waiting") return;
+    openReview(record, pseudonyms);
+    record.revision++;
+    this.save(record);
+    this.broadcast(record);
+    await this.ctx.storage.setAlarm(nextDeadline(record));
+  }
+  /** For a personal channel link: whether this person joined, and their ballot. */
+  async memberRound(
+    member: string,
+  ): Promise<{ participating?: boolean; ballot?: ReviewBallot }> {
+    const record = this.read();
+    if (!record || Date.now() >= record.expiresAt || !record.review) return {};
+    const ballot = reviewBallot(record, member, Date.now());
+    if (ballot) return { participating: true, ballot };
+    const key = record.review.key;
+    if (!key || record.review.status !== "waiting") return {};
+    for (const id of Object.keys(record.slack?.mapping ?? {}))
+      if (equalHash(await pseudonym(key, id), member))
+        return { participating: true };
+    return { participating: false };
+  }
+  /** One ballot per person; closes the review as soon as everyone voted. */
+  async submitRoundReview(
+    member: string,
+    drawId: unknown,
+    submission: unknown,
+  ): Promise<{ code?: string; status?: number }> {
+    const record = this.read();
+    if (!record || Date.now() >= record.expiresAt)
+      return { status: 409, code: "review_closed" };
+    try {
+      if (submitReview(record, member, drawId, submission, Date.now()))
+        closeReview(record, Date.now());
+    } catch (error) {
+      return error instanceof RequestError
+        ? { status: error.status, code: error.code }
+        : { status: 503, code: "unavailable" };
+    }
+    record.revision++;
+    this.save(record);
+    this.broadcast(record);
+    await this.ctx.storage.setAlarm(nextDeadline(record));
+    return {};
   }
   private async importSlack(
     record: StoredSession,
@@ -869,6 +951,7 @@ export class LiveSession extends DurableObject<Env & SlackSecrets> {
         card.startAt,
         variant,
         card,
+        record.review?.status === "open" ? record.review.link : undefined,
       ),
     );
     const latest = this.read();
@@ -886,6 +969,70 @@ export class LiveSession extends DurableObject<Env & SlackSecrets> {
       current.status = "pending";
       current.readyAt = result.retryAt;
     }
+    this.save(latest);
+    await this.ctx.storage.setAlarm(nextDeadline(latest));
+  }
+  /**
+   * Closes voting at its deadline, then posts the anonymous results once in
+   * the thread: claimed before I/O, never repeated when delivery is uncertain,
+   * retried at most once after a definite rejection.
+   */
+  private async processReview() {
+    const record = this.read();
+    const review = record?.review,
+      source = record?.slack?.source;
+    if (!record || Date.now() >= record.expiresAt || !review || !source) return;
+    if (review.status === "open" && Date.now() >= review.closesAt!) {
+      closeReview(record, Date.now());
+      record.revision++;
+      this.save(record);
+      this.broadcast(record);
+    }
+    const job = review.job;
+    if (!job) return;
+    if (job.status === "posting") {
+      if (Date.now() >= job.attemptedAt! + 120000) {
+        settleReviewJob(job, "uncertain");
+        this.save(record);
+      }
+      return;
+    }
+    if (job.status !== "pending" || job.readyAt > Date.now()) return;
+    const variant = record.variant ?? "coffee";
+    if (
+      !slackAllowed(
+        record.slack!.grantHash,
+        slackEnvironment(this.env, variant),
+      )
+    ) {
+      settleReviewJob(job, "failed");
+      this.save(record);
+      return;
+    }
+    job.status = "posting";
+    job.attempts++;
+    const attemptedAt = (job.attemptedAt = Date.now());
+    this.save(record);
+    await this.ctx.storage.setAlarm(nextDeadline(record));
+    await this.ctx.storage.sync();
+    const result = await postMessage(
+      new SlackApiClient(slackEnvironment(this.env, variant).SLACK_BOT_TOKEN!),
+      source.channelId,
+      reviewBody(source.channelId, source.parentMessageTs, job.results),
+    );
+    const latest = this.read();
+    const current = latest?.review?.job;
+    if (
+      !latest ||
+      Date.now() >= latest.expiresAt ||
+      current?.status !== "posting" ||
+      current.attemptedAt !== attemptedAt
+    )
+      return;
+    if (result.status === "failed" && current.attempts < 2) {
+      current.status = "pending";
+      current.readyAt = result.retryAt;
+    } else settleReviewJob(current, result.status);
     this.save(latest);
     await this.ctx.storage.setAlarm(nextDeadline(latest));
   }
