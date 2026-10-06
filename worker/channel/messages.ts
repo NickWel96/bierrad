@@ -256,14 +256,18 @@ export function reviewBody(
     plain.push(
       `${index ? "\n" : ""}⭐ Reviews voor ${result.name}\n${display.text}  ${display.value} gemiddeld · ${result.count} ${result.count === 1 ? "beoordeling" : "beoordelingen"}`,
     );
-    // Anonymous texts as literal quotes; Slack never parses them.
-    for (const text of result.texts) {
+    // Anonymous texts as literal text, one bullet each: Slack would merge
+    // consecutive quotes into one.
+    if (result.texts.length)
       sections.push({
-        type: "rich_text_quote",
-        elements: [{ type: "text", text }],
+        type: "rich_text_list",
+        style: "bullet",
+        elements: result.texts.map((text) => ({
+          type: "rich_text_section",
+          elements: [{ type: "text", text }],
+        })),
       });
-      plain.push(`> ${text}`);
-    }
+    for (const text of result.texts) plain.push(`• ${text}`);
   });
   return {
     channel: channelId,

@@ -273,7 +273,7 @@ test(
       assert.equal(review.thread_ts, invited.ts);
       assert.equal(review.reply_broadcast, false);
       assert.ok(!String(review.text).includes("<!channel>"));
-      assert.ok(JSON.stringify(review.blocks).includes(JSON.stringify({ type: "rich_text_quote", elements: [{ type: "text", text }] })));
+      assert.ok(JSON.stringify(review.blocks).includes(JSON.stringify({ type: "rich_text_section", elements: [{ type: "text", text }] })));
       assert.match(String(review.text), /:star::star::star::star::bierrad_star_5: {2}4\.5 gemiddeld · 2 beoordelingen/);
       const rated = updates.at(-1)!;
       assert.match(String(rated.text), /haalde koffie · :star::star::star::star::bierrad_star_5: 4\.5$/);

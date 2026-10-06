@@ -32,7 +32,11 @@ test("both review replies and channel cards use five emoji elements per rated wi
   const sections = reply.blocks[0].elements as { type: string; elements: Record<string, unknown>[] }[];
   for (const [i, section] of sections.filter((s) => s.type === "rich_text_section").entries())
     assert.deepEqual(section.elements.filter((e) => e.type === "emoji"), slackRating(results[i].average).elements);
-  assert.deepEqual(sections.at(-1), { type: "rich_text_quote", elements: [{ type: "text", text: results[1].texts[0] }] });
+  assert.deepEqual(sections.at(-1), {
+    type: "rich_text_list",
+    style: "bullet",
+    elements: [{ type: "rich_text_section", elements: [{ type: "text", text: results[1].texts[0] }] }],
+  });
   const card = settledCallBody("C00000001", "1234567890.123456", Date.parse("2026-10-06T12:00:00Z"), "water", {
     kind: "winner", names: results.map((r) => r.name), mentionIds: results.map((r) => r.mentionId), participants: 12,
     ratings: results.map(({ average, count }) => ({ average, count })),
