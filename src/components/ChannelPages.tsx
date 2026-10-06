@@ -382,7 +382,7 @@ export function ChannelWheelPage({
               <span>Typ /koffierad of /waterrad in het kanaal voor een nieuwe ronde.</span>
             )}
             {viewLink}
-            {!member && <ReviewProgressNote controller={live} />}
+            <ReviewProgressNote controller={live} />
             {notice && <small role="status">{notice}</small>}
             {memberBar}
             {join}
@@ -555,7 +555,7 @@ function ServerTimeLeft({
   );
   return <TimeLeft startAt={startAt} offsetMs={offsetMs} />;
 }
-/** Shared screens only: how many have voted, never who. */
+/** How many have voted, never who: the spectator count everyone already sees. */
 function ReviewProgressNote({
   controller,
 }: {
