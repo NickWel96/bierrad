@@ -26,12 +26,12 @@ export const reviewLabels: Record<
 };
 
 export interface ReviewSettings {
-  /** The default for new rounds; a request may choose otherwise. */
+  /** The default for new rounds (on unless the admin turned it off); a request may choose otherwise. */
   enabled: boolean;
   minutes: number;
 }
 export const DEFAULT_REVIEW_SETTINGS: ReviewSettings = {
-  enabled: false,
+  enabled: true,
   minutes: DEFAULT_REVIEW_MINUTES,
 };
 export function validReviewMinutes(value: unknown): value is number {

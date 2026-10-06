@@ -159,6 +159,8 @@ test(
       const begin = await navigate("/auth/slack/channel/C00000001");
       const bound = await callback(begin.headers.get("location")!, begin.headers.get("set-cookie")!.split(";")[0]);
       const [, admin, requester] = /#\/koffie-beheer\/([a-f0-9.]+)\/([a-f0-9.]+)$/.exec(bound.headers.get("location")!)!;
+      // Every binding, existing ones too, starts with reviews on and 15 minutes.
+      assert.deepEqual((await status(requester)).reviews, { enabled: true, minutes: 15 });
       assert.equal((await api(requester, { type: "setReviews", enabled: true, minutes: 5 })).status, 403);
       assert.equal((await api(admin, { type: "setReviews", enabled: true, minutes: 7 })).status, 400);
       assert.deepEqual((await status(admin, { type: "setReviews", enabled: true, minutes: 5 })).reviews, { enabled: true, minutes: 5 });

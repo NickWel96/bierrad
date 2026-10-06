@@ -18,6 +18,12 @@ Implementatiereview tegen [SECURITY.md](../SECURITY.md#round-reviews--reviewed-e
 - **Sessie:** tot het sluiten de sleutel, de kanaallink, de pseudoniemen van wie mag stemmen en van wie gestemd heeft, en per winnaar de som, het aantal en de teksten. Bij het sluiten worden de pseudoniemen, de sleutel en de link gewist. De teksten worden gewist zodra het threadbericht is afgehandeld. De rest verdwijnt met de sessie, één uur na de start.
 - **DTO's:** toeschouwers zien alleen `{closesAt, voted, eligible}`; een persoonlijke link ziet alleen de eigen deelname en het eigen stembiljet.
 
+## Standaard
+
+Reviews staan standaard aan, met 15 minuten stemtijd, ook voor bestaande koppelingen zonder opgeslagen keuze (gevraagd door de eigenaar op 2026-10-06). Daardoor linkt een oproep standaard naar de kanaalpagina in plaats van naar de woordlink. Dat is dezelfde link die al in het koppelbericht staat, dus het publiek wordt niet groter. De beheerder kan reviews uitzetten, en per aanvraag kan het ook.
+
+Een persoonlijke pagina vraagt het stemformulier 3 en 8 seconden na de finale op, en daarnaast elke 10 seconden. Het formulier verschijnt dus een paar seconden nadat het rad gestopt is, na het feestelijke moment.
+
 ## Gecontroleerde risico's
 
 - **Winnaar uitlekken:** stembiljetten openen pas na de laatste onthulling, en de server weigert te vroege stemmen.

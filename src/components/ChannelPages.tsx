@@ -227,6 +227,25 @@ export function ChannelWheelPage({
       window.removeEventListener("focus", refresh);
     };
   }, [run]);
+  // A personal link asks for its ballot right after the finale instead of
+  // waiting for the next poll; a second try covers a slightly late server.
+  const isMember = status?.role === "member";
+  useEffect(() => {
+    if (!live || !isMember) return;
+    let finished = live.getSnapshot().session.state === "finished";
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const unsubscribe = live.subscribe(() => {
+      const now = live.getSnapshot().session.state === "finished";
+      if (now && !finished)
+        for (const delay of [3000, 8000])
+          timers.push(setTimeout(() => void run().catch(() => {}), delay));
+      finished = now;
+    });
+    return () => {
+      unsubscribe();
+      timers.forEach(clearTimeout);
+    };
+  }, [live, isMember, run]);
   async function act(command: ChannelCommand, done?: string) {
     setPending(true);
     setNotice("");
