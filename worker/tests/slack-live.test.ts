@@ -557,7 +557,11 @@ for (const variant of ["beer", "coffee", "water"] as const)
         );
         assert.equal(sent[0].thread_ts, "1234567890.123456");
         assert.equal(sent[0].reply_broadcast, false);
-        assert.ok(String(sent[0].text).includes(official.join(" · ")));
+        assert.equal(official.length, 2);
+        // The fallback mentions the Slack winner (so Slack notifies them); Bob stays text.
+        assert.ok(String(sent[0].text).includes("<@U00000003>"));
+        assert.ok(String(sent[0].text).includes("Bob"));
+        assert.equal(String(sent[0].text).match(/<@/g)?.length, 1);
         const resultBlocks = sent[0].blocks as {
           elements: {
             elements: { type: string; user_id?: string; text?: string }[];

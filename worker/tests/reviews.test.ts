@@ -186,8 +186,16 @@ test("the review post quotes anonymous texts literally, in the thread only", () 
   assert.equal(body.parse, "none");
   assert.equal(body.mrkdwn, false);
   assert.equal(body.unfurl_links, false);
-  // Escaped fallback: no mention, broadcast or link survives.
-  assert.ok(!/<[!@h]/.test(body.text));
+  // Escaped fallback: only the frozen identity is a mention (so Slack notifies);
+  // the name and texts cannot mention, broadcast or link.
+  assert.deepEqual(body.text.match(/<[^>]*>/g), ["<@U00000001>"]);
+  assert.ok(body.text.includes("&lt;!here&gt;"));
+  assert.ok(!body.text.includes("U00000002"));
+  const manual = reviewBody("C00000001", "1", [
+    { name: "<@U00000002>", mentionId: null, average: 3, count: 1, texts: [] },
+  ]);
+  assert.ok(!/<[!@h]/.test(manual.text));
+  assert.ok(manual.text.includes("&lt;@U00000002&gt;"));
   const blocks = body.blocks[0].elements as { type: string; elements: Record<string, unknown>[] }[];
   assert.deepEqual(blocks[0].elements[1], { type: "user", user_id: "U00000001" });
   assert.deepEqual(blocks[1], {
