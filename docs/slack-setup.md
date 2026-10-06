@@ -67,6 +67,7 @@ Zonder Slack-account/token test `npm test` de echte Worker/SQLite/alarms met een
 - [reactions.get](https://docs.slack.dev/reference/methods/reactions.get/): `full=true`; het aantal moet overeenkomen met de unieke ontvangen gebruikers, anders geen import.
 - [users.info](https://docs.slack.dev/reference/methods/users.info/): beperkte naamselectie; geen email scope.
 - [chat.postMessage](https://docs.slack.dev/reference/methods/chat.postMessage/): parent `thread_ts`, geen reply_broadcast, plain_text blocks en niet-geparste fallback.
+- [chat.update](https://docs.slack.dev/reference/methods/chat.update/): alleen de eigen oproep van een kanaalronde, met dezelfde `chat:write`-scope.
 - [Sign in with Slack](https://docs.slack.dev/authentication/sign-in-with-slack/): `openid.connect.token` en ID-tokenclaims; [auth.test](https://docs.slack.dev/reference/methods/auth.test/) voor de workspace van de bot; [auth.revoke](https://docs.slack.dev/reference/methods/auth.revoke/) voor het gebruikerstoken.
 
 
@@ -141,7 +142,7 @@ Waterrondes gebruiken dezelfde Koffierad-app, dezelfde koppeling en dezelfde lin
 
 - Aanvragen via de aanvraaglink (keuze 1, 2, 3, 5, 10 of 15 minuten, standaard 5, met een knop voor een koffie- en een waterronde) of met `/koffierad` / `/koffierad 10` of `/waterrad` / `/waterrad 10` (1 tot 30 minuten) in het kanaal. Bij succes antwoordt het slashcommando niet (de oproep is de bevestiging); foutmeldingen zie alleen jij.
 - De bot plaatst een oproep in het kanaal met een "Kijk live mee"-link naar de meekijklink in woorden (bij oudere koppelingen het vaste kanaalrad) en zet er direct een ☕ (waterronde: 💧) onder. Collega's klikken die aan; een ronde telt uitsluitend haar eigen reactie. De botreactie telt nooit mee: de bot wordt op gebruikers-ID én als bot uitgefilterd.
-- Elke minuut leest de server de reacties, zodat kijkers het rad zien vollopen. Vlak voor de start volgt de normale eindcontrole. Daarna draait het rad met precies één winnaar, die met @vermelding in de thread van de oproep wordt gemeld en daarbij ook in het kanaal verschijnt (zoals het vinkje "Ook naar kanaal sturen"). Zonder deelnemers, of als de reacties niet te lezen zijn, plaatst de bot daar een vaste melding.
+- Elke minuut leest de server de reacties, zodat kijkers het rad zien vollopen. Vlak voor de start volgt de normale eindcontrole. Daarna draait het rad met precies één winnaar, die met @vermelding in de thread van de oproep wordt gemeld (niet ook in het kanaal). De bot werkt de oproep zelf bij met de winnaar en het aantal deelnemers, zodat het kanaal per ronde één bericht houdt. Zonder deelnemers, of als de reacties niet te lezen zijn, staat dat in de bijgewerkte oproep. Mislukt het bijwerken, dan probeert de server het hooguit drie keer; de threaduitslag blijft de officiële uitslag.
 - Het vaste kanaalrad en de meekijklink nemen het thema van de ronde over: bruin bij koffie, blauw bij water. Zonder lopende ronde blijft het thema van de laatste ronde staan.
 - Per kanaal loopt er hooguit één ronde tegelijk, koffie of water, met samen maximaal 25 rondes per 24 uur. Zodra het rad is gestopt (of de ronde niet doorging), kan direct een nieuwe ronde worden aangevraagd. Er wordt niet vermeld wie de ronde aanvroeg.
 

@@ -1,5 +1,5 @@
-import { channelCopy } from "../../shared/channel";
 import { reactionVariant, themes } from "../../shared/variant";
+import type { CallOutcome } from "../channel/messages";
 import { createSession } from "../../src/domain/drawEngine";
 import type { WheelVariant } from "../../shared/variant";
 import type { SlackReminderStatus } from "../../shared/protocol";
@@ -8,16 +8,25 @@ import { RequestError } from "../session";
 import type { SlackPerson, SlackSource } from "./source";
 import { SlackApiClient, SlackError } from "./api";
 export type ChannelNotice = "empty" | "unreadable";
+/** Updates of a channel round's own call; repeating one is harmless. */
+export const MAX_CARD_ATTEMPTS = 3;
+/**
+ * A settled channel round rewrites its call message in place, so the channel
+ * keeps one message per round. Only the bot's own call is ever updated.
+ */
+export type CallCard = CallOutcome & {
+  startAt: number;
+  status: "pending" | "updating" | "updated" | "failed";
+  readyAt: number;
+  attempts: number;
+  attemptedAt?: number;
+};
 export interface SlackJob {
   drawId: string;
   source: SlackSource;
   names: string[];
   /** Private, frozen in winner order; absent on jobs created before mentions shipped. */
   mentionIds?: (string | null)[];
-  /** Channel rounds without a draw: a fixed notice instead of winners. */
-  notice?: ChannelNotice;
-  /** Channel round winners are also sent to the channel ("Also send to"). */
-  broadcast?: boolean;
   status: "pending" | "posting" | "posted" | "failed" | "uncertain";
   readyAt: number;
   attemptedAt?: number;
@@ -56,6 +65,8 @@ export interface SlackState {
   nextFinalImportAt?: number;
   retryImportAt?: number;
   job?: SlackJob;
+  /** Channel rounds only: the pending rewrite of the call message. */
+  card?: CallCard;
   reminder?: SlackReminder;
   reminderPosts?: number;
   /** Started by a channel-bound Koffierad: no host, refreshes itself until the draw. */
@@ -117,65 +128,40 @@ export function queueResult(record: StoredSession) {
         record.session.participants.find((p) => p.id === spin.winnerId)!.name,
     ),
     mentionIds: draw.spins.map((spin) => identities.get(spin.winnerId) ?? null),
-    ...(slack.channelRound ? { broadcast: true } : {}),
     status: "pending",
     readyAt: Math.max(
       ...draw.spins.map((s) => Date.parse(s.startAt) + s.durationMs),
     ),
   };
+  if (slack.channelRound && record.scheduledDraw)
+    slack.card = {
+      kind: "winner",
+      names: [...slack.job.names],
+      mentionIds: [...slack.job.mentionIds!],
+      participants: draw.participantIds.length,
+      startAt: Date.parse(record.scheduledDraw.startAt),
+      status: "pending",
+      readyAt: slack.job.readyAt,
+      attempts: 0,
+    };
 }
-/** A channel round that ended without a draw still closes its thread. */
+/** A channel round that ended without a draw says so in its call, not in a thread. */
 export function queueChannelNotice(
   record: StoredSession,
   notice: ChannelNotice,
   now: number,
 ) {
   const slack = record.slack;
-  if (!slack?.channelRound || !slack.source) return;
-  slack.job = {
-    drawId: crypto.randomUUID(),
-    source: { ...slack.source },
-    names: [],
-    notice,
+  if (!slack?.channelRound || !slack.source || !record.scheduledDraw) return;
+  slack.card = {
+    kind: notice,
+    startAt: Date.parse(record.scheduledDraw.startAt),
     status: "pending",
     readyAt: now,
-  };
-}
-/** Channel rounds are coffee or water; the frozen reaction says which. */
-function noticeText(source: SlackSource, notice: ChannelNotice): string {
-  const variant =
-    reactionVariant(source.reactionName) === "water" ? "water" : "coffee";
-  const theme = themes[variant],
-    copy = channelCopy[variant];
-  return notice === "empty"
-    ? `${theme.icon} Niemand deed mee aan deze ${copy.round}, dus het rad bleef stil. Dan maar zelf ${copy.tap}!`
-    : `${theme.icon} Het ${theme.name} kon de reacties niet lezen, dus er is niet gedraaid. Vraag gerust een nieuwe ronde aan.`;
-}
-/** Fixed text only; the same safe posting options as results. */
-function noticeBody(source: SlackSource, text: string) {
-  return {
-    channel: source.channelId,
-    thread_ts: source.parentMessageTs,
-    text,
-    blocks: [
-      {
-        type: "rich_text",
-        elements: [
-          { type: "rich_text_section", elements: [{ type: "text", text }] },
-        ],
-      },
-    ],
-    mrkdwn: false,
-    parse: "none",
-    link_names: false,
-    reply_broadcast: false,
-    unfurl_links: false,
-    unfurl_media: false,
+    attempts: 0,
   };
 }
 export function resultBody(job: SlackJob) {
-  if (job.notice)
-    return noticeBody(job.source, noticeText(job.source, job.notice));
   const theme = themes[reactionVariant(job.source.reactionName)];
   const heading = `${theme.icon} Het rad heeft gesproken!\n`;
   const ending = `${job.names.length === 1 ? "Jij mag" : "Jullie mogen"} ${theme.drink} halen!`;
@@ -215,8 +201,8 @@ export function resultBody(job: SlackJob) {
     mrkdwn: false,
     parse: "none",
     link_names: false,
-    // Only the winners of a channel round; never notices or Bierrad results.
-    reply_broadcast: job.broadcast === true,
+    // Channel rounds show the winner in their updated call instead.
+    reply_broadcast: false,
     unfurl_links: false,
     unfurl_media: false,
   };
@@ -244,6 +230,24 @@ export async function postMessage(
         error instanceof SlackError && !error.uncertain
           ? "failed"
           : "uncertain",
+      retryAt:
+        Date.now() + (error instanceof SlackError ? error.retryAfterMs : 60000),
+    };
+  }
+}
+/** Rewrites one of the bot's own messages; the response must name that message. */
+export async function updateMessage(
+  api: SlackApiClient,
+  body: { channel: string; ts: string } & Record<string, unknown>,
+): Promise<{ status: "updated" } | { status: "failed"; retryAt: number }> {
+  try {
+    const result = await api.call("chat.update", body);
+    if (result.channel !== body.channel || result.ts !== body.ts)
+      throw new SlackError("slack_response");
+    return { status: "updated" };
+  } catch (error) {
+    return {
+      status: "failed",
       retryAt:
         Date.now() + (error instanceof SlackError ? error.retryAfterMs : 60000),
     };

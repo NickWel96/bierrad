@@ -1,4 +1,5 @@
-import type { ChannelVariant } from "../shared/channel";
+import { isChannelVariant, type ChannelVariant } from "../shared/channel";
+import { settledCallBody } from "./channel/messages";
 import { themes, type WheelVariant } from "../shared/variant";
 import { SlackApiClient, SlackError } from "./slack/api";
 import {
@@ -9,6 +10,8 @@ import {
 import {
   reconcile,
   postResult,
+  updateMessage,
+  MAX_CARD_ATTEMPTS,
   postReminder,
   reminderBody,
   MAX_REMINDER_POSTS,
@@ -454,6 +457,7 @@ export class LiveSession extends DurableObject<Env & SlackSecrets> {
     await this.processChannelRefresh();
     await this.processScheduledDraw();
     await this.processSlackResult();
+    await this.processCallCard();
     const latest = this.read();
     if (latest && Date.now() < latest.expiresAt)
       await this.ctx.storage.setAlarm(nextDeadline(latest));
@@ -822,5 +826,67 @@ export class LiveSession extends DurableObject<Env & SlackSecrets> {
     latest.revision++;
     this.save(latest);
     this.broadcast(latest);
+  }
+  /**
+   * Rewrites a settled channel round's call. Same claim-before-I/O discipline
+   * as posts, but an update is idempotent, so an uncertain one may be repeated
+   * (at most MAX_CARD_ATTEMPTS times in total).
+   */
+  private async processCallCard() {
+    const record = this.read();
+    const card = record?.slack?.card,
+      source = record?.slack?.source;
+    if (!record || Date.now() >= record.expiresAt || !card || !source) return;
+    if (card.status === "updating") {
+      if (Date.now() < card.attemptedAt! + 120000) return;
+      card.status = "pending";
+    }
+    if (card.status !== "pending" || card.readyAt > Date.now()) return;
+    const variant = record.variant;
+    if (
+      card.attempts >= MAX_CARD_ATTEMPTS ||
+      !isChannelVariant(variant) ||
+      !slackAllowed(
+        record.slack!.grantHash,
+        slackEnvironment(this.env, variant),
+      )
+    ) {
+      card.status = "failed";
+      this.save(record);
+      return;
+    }
+    card.status = "updating";
+    card.attempts++;
+    const attemptedAt = (card.attemptedAt = Date.now());
+    this.save(record);
+    await this.ctx.storage.setAlarm(nextDeadline(record));
+    await this.ctx.storage.sync();
+    const result = await updateMessage(
+      new SlackApiClient(slackEnvironment(this.env, variant).SLACK_BOT_TOKEN!),
+      settledCallBody(
+        source.channelId,
+        source.parentMessageTs,
+        card.startAt,
+        variant,
+        card,
+      ),
+    );
+    const latest = this.read();
+    const current = latest?.slack?.card;
+    if (
+      !latest ||
+      Date.now() >= latest.expiresAt ||
+      current?.status !== "updating" ||
+      current.attemptedAt !== attemptedAt
+    )
+      return;
+    if (result.status === "updated") current.status = "updated";
+    else if (current.attempts >= MAX_CARD_ATTEMPTS) current.status = "failed";
+    else {
+      current.status = "pending";
+      current.readyAt = result.retryAt;
+    }
+    this.save(latest);
+    await this.ctx.storage.setAlarm(nextDeadline(latest));
   }
 }

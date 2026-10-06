@@ -24,6 +24,7 @@ export class SlackApiClient {
       | "reactions.get"
       | "users.info"
       | "chat.postMessage"
+      | "chat.update"
       | "reactions.add"
       | "auth.test"
       | "auth.revoke"
@@ -33,7 +34,9 @@ export class SlackApiClient {
   ): Promise<SlackObject> {
     const posting = method === "chat.postMessage";
     // Writes travel as a JSON body; only message posts track uncertain delivery.
-    const write = posting || method === "reactions.add";
+    // Updates are idempotent: repeating one cannot duplicate a message.
+    const write =
+      posting || method === "reactions.add" || method === "chat.update";
     // Client credentials travel in a form body, never in a URL or header.
     const form = method === "openid.connect.token";
     try {
