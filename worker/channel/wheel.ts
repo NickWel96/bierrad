@@ -3,7 +3,6 @@ import {
   CHANNEL_IDLE_TTL_MS,
   channelCopy,
   DEFAULT_ROUND_MINUTES,
-  isChannelVariant,
   MAX_ROUNDS_PER_DAY,
   roundStartAt,
   validRoundMinutes,
@@ -464,7 +463,7 @@ export class ChannelWheel extends DurableObject<Env & SlackSecrets> {
     await this.arm(binding);
     return `${binding.locator}.${secret}`;
   }
-  /** Link holders: status, round requests and (admin only) management. */
+  /** Link holders: status, reviews and (admin only) management; never round requests. */
   async access(secret: string, command: unknown): Promise<Response> {
     try {
       // Generated before authorization so no await separates read and write below.
@@ -484,8 +483,8 @@ export class ChannelWheel extends DurableObject<Env & SlackSecrets> {
         return json({ type: "status", status } satisfies ChannelCommandResult);
       };
       if (command === null) return await reply();
+      // No round requests: rounds start only from a signed /koffierad or /waterrad.
       const allowed: Record<string, string[]> = {
-        requestRound: ["minutes", "variant", "reviews"],
         setDefaultMinutes: ["minutes"],
         setReviews: ["enabled", "minutes"],
         review: ["drawId", "scores", "texts"],
@@ -506,19 +505,7 @@ export class ChannelWheel extends DurableObject<Env & SlackSecrets> {
       )
         throw new RequestError(400, "invalid");
       const input = command as Record<string, unknown>;
-      if (input.type === "requestRound") {
-        if (
-          !validRoundMinutes(input.minutes) ||
-          ("variant" in input && !isChannelVariant(input.variant)) ||
-          ("reviews" in input && typeof input.reviews !== "boolean")
-        )
-          throw new RequestError(400, "invalid");
-        await this.startRound(
-          input.minutes,
-          isChannelVariant(input.variant) ? input.variant : "coffee",
-          typeof input.reviews === "boolean" ? input.reviews : undefined,
-        );
-      } else if (input.type === "review" || input.type === "logout") {
+      if (input.type === "review" || input.type === "logout") {
         // Only a personal link speaks for one person.
         if (!member) throw new RequestError(403, "forbidden");
         if (input.type === "logout") {
@@ -641,7 +628,6 @@ export class ChannelWheel extends DurableObject<Env & SlackSecrets> {
   private async startRound(
     minutes: number,
     variant: ChannelVariant,
-    reviews?: boolean,
   ): Promise<{ startAt: string; spectatorCapability: string }> {
     const reaction = themes[variant].reaction;
     const spectator = randomWords();
@@ -660,8 +646,7 @@ export class ChannelWheel extends DurableObject<Env & SlackSecrets> {
       throw new RequestError(503, "unavailable");
     const settings = binding.reviews ?? DEFAULT_REVIEW_SETTINGS;
     // Reviews need the fixed channel page to log in on.
-    const reviewed =
-      (reviews ?? settings.enabled) && !!binding.requestCapability;
+    const reviewed = settings.enabled && !!binding.requestCapability;
     // A round blocks the next until its draw is over (or it can no longer be watched).
     if (
       binding.round &&

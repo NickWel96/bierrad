@@ -127,7 +127,7 @@ Een hostcapability bestaat uit een willekeurige 128-bit locator plus een onafhan
 | `POST /api/command` | Geldige host | Strikt getypeerd commando met actuele revisie |
 | `GET /api/socket` upgrade | Geldige host of kijker | Snapshotupdates; alleen pingberichten toegestaan |
 | `GET /api/channel` | Geldige beheer- of aanvraaglink van een kanaal-Koffierad | Status, standaardwachttijd en lopende ronde |
-| `POST /api/channel` | Idem; beheer alleen met beheerlink | `requestRound` (1–30 minuten), `setDefaultMinutes`, `rotateRequestLink`, `unbind` |
+| `POST /api/channel` | Idem; beheer alleen met beheerlink | `setDefaultMinutes`, `setReviews`, `rotateRequestLink`, `unbind`; met een persoonlijke link `review` en `logout`. Rondes starten alleen met `/koffierad` of `/waterrad`. |
 | `POST /slack/commands` | Uitsluitend met geldige Slack-handtekening | `/koffierad [minuten]` of `/waterrad [minuten]` start een koffie- of waterronde in het gekoppelde kanaal |
 
 HTTP gebruikt `Authorization: Bearer <capability>`. Browsers bieden bij WebSocket-upgrade `bierrad, auth.<capability>` als subprotocol aan; de server selecteert alleen `bierrad`. Geen capabilities in backend-URLs of querystrings. Commando's: `setParticipants` (namen, server maakt IDs), `setWinnerCount`, `setScheduledDraw` (ISO-tijd of null om te annuleren, optioneel met `spectatorCapability` om de kijklink vooraf in de Slack-thread te laten plaatsen), `startDraw`, `reset`, `endSession`. De client kan nooit officiële winnaars/instructies aanleveren. Backendrechten zijn bepalend; frontendcapabilities zijn alleen UX.

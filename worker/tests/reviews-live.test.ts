@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import { wordLocator } from "../auth";
@@ -51,6 +52,7 @@ test(
               COFFEE_SLACK_BOT_TOKEN: "synthetic-coffee-credential",
               COFFEE_SLACK_CLIENT_ID: clientId,
               COFFEE_SLACK_CLIENT_SECRET: "synthetic-coffee-client-secret",
+              COFFEE_SLACK_SIGNING_SECRET: "synthetic-signing-secret",
             },
             ratelimits: {
               CREATION_LIMIT: { namespace_id: "40", simple: { limit: 100, period: 60 } },
@@ -125,6 +127,18 @@ test(
       assert.equal(response.status, 200, await response.clone().text());
       return ((await response.json()) as { status: ChannelStatus }).status;
     };
+    /** A signed `/koffierad` in the bound channel: the only way to start a round. */
+    const koffierad = async () => {
+      const body = new URLSearchParams({ command: "/koffierad", user_id: "U00000001", channel_id: "C00000001", team_id: "T00000001", text: "" }).toString();
+      const at = Math.floor(Date.now() / 1000);
+      const signature = createHmac("sha256", "synthetic-signing-secret").update(`v0:${at}:${body}`).digest("hex");
+      const response = await mf.dispatchFetch("http://localhost/slack/commands", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", "X-Slack-Request-Timestamp": String(at), "X-Slack-Signature": `v0=${signature}` },
+        body,
+      });
+      assert.equal(await response.text(), "");
+    };
     const navigate = (path: string, cookie?: string, init?: RequestInit) =>
       mf.dispatchFetch(`http://localhost${path}`, {
         redirect: "manual",
@@ -184,7 +198,8 @@ test(
       assert.equal((await api(bob)).status, 404);
       const aliceStatus = await status(alice);
       assert.equal(aliceStatus.role, "member");
-      // Members request rounds but never manage the binding.
+      // Members never request rounds or manage the binding.
+      assert.equal((await api(alice, { type: "requestRound", minutes: 5 })).status, 400);
       for (const command of [{ type: "unbind" }, { type: "rotateRequestLink" }, { type: "setReviews", enabled: false, minutes: 5 }])
         assert.equal((await api(alice, command)).status, 403);
       assert.equal((await api(requester, { type: "review", drawId: "x", scores: [5], texts: [""] })).status, 403);
@@ -195,7 +210,8 @@ test(
         assert.ok(!(await channel.stored()).includes(secret), secret);
 
       // A round with reviews: the call links the channel page to log in.
-      const round = (await status(requester, { type: "requestRound", minutes: 5 })).round!;
+      await koffierad();
+      const round = (await status(requester)).round!;
       assert.equal(round.reviews, true);
       const call = posts.at(-1)!;
       assert.ok(JSON.stringify(call.blocks).includes(`{"type":"link","url":"${origin}/#/koffie/${requester}","text":"Open de ronde"}`));

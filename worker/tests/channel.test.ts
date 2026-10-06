@@ -494,17 +494,22 @@ test(
       // Requesters cannot manage; unknown links, shapes and hosts are refused.
       for (const command of [{ type: "unbind" }, { type: "rotateRequestLink" }, { type: "setDefaultMinutes", minutes: 3 }])
         assert.equal((await api(requester, command)).status, 403);
-      for (const command of [{ type: "requestRound", minutes: 0 }, { type: "requestRound", minutes: 31 }, { type: "requestRound", minutes: 5, winners: 2 }, { type: "drop" }])
+      for (const command of [{ type: "setDefaultMinutes", minutes: 3, extra: 1 }, { type: "drop" }])
         assert.equal((await api(requester, command)).status, 400, JSON.stringify(command));
+      // Rounds start only from a signed slash command: no link can request one.
+      for (const link of [requester, admin])
+        for (const command of [{ type: "requestRound", minutes: 5 }, { type: "requestRound", minutes: 5, variant: "water", reviews: true }])
+          assert.equal((await api(link, command)).status, 400);
       assert.equal((await api(`${admin.split(".")[0]}.${randomHex()}`)).status, 404);
       assert.equal((await api("one-two-three-four-five")).status, 404);
       // Reviews are on by default; this suite covers rounds without them
       // (reviews-live.test.ts covers the rest).
       await status(admin, { type: "setReviews", enabled: false, minutes: 15 });
 
-      // A round from the link: one call message, a prefilled ☕, a viewer-only session.
+      // A round from /koffierad (the default wait): one call message, a prefilled ☕, a viewer-only session.
       const before = posts.length;
-      const started = (await status(requester, { type: "requestRound", minutes: 5 })) as { status: { round: { startAt: string; spectatorCapability: string; active: boolean } } };
+      assert.equal((await slash({})).status, 200);
+      const started = (await status(requester)) as { status: { round: { startAt: string; spectatorCapability: string; active: boolean } } };
       const round = started.status.round;
       assert.ok(round);
       assert.equal(posts.length, before + 1);
@@ -532,8 +537,7 @@ test(
       assert.equal(Date.parse(round.startAt) % 60000, 0);
       assert.ok(wait > 5 * 60000 - 5000 && wait <= 6 * 60000, String(wait));
 
-      // One round at a time, from either entry point.
-      assert.equal((await api(requester, { type: "requestRound", minutes: 2 })).status, 409);
+      // One round at a time.
       const busy = (await (await slash({ text: "3" })).json()) as { response_type: string; text: string };
       assert.equal(busy.response_type, "ephemeral");
       assert.match(busy.text, /loopt al een koffieronde/);
@@ -588,7 +592,7 @@ test(
       assert.match(await session.stored(), /"card":\{[^}]*"status":"updated"/);
 
       // While the wheel still spins, the round keeps blocking the next one.
-      assert.equal((await api(requester, { type: "requestRound", minutes: 2 })).status, 409);
+      assert.match(((await (await slash({ text: "2" })).json()) as { text: string }).text, /loopt al een koffieronde/);
       // Once it has stopped, a new round can start right away, well before the watch window ends.
       await session.land();
       // The fixed page keeps showing the result, but the round no longer blocks.
@@ -613,8 +617,6 @@ test(
       assert.equal(((await status(requester)) as { status: { round?: object } }).status.round, undefined);
 
       // Water: /waterrad on the same binding, a 💧 call, only :droplet: counts.
-      assert.equal((await api(requester, { type: "requestRound", minutes: 5, variant: "tea" })).status, 400);
-      assert.equal((await api(requester, { type: "requestRound", minutes: 5, variant: "beer" })).status, 400);
       const watered = await slash({ command: "/waterrad", text: "2" });
       assert.equal(watered.status, 200);
       assert.equal(await watered.text(), "");
@@ -627,7 +629,6 @@ test(
       assert.equal(waterStatus.round.variant, "water");
       assert.equal(((await status(watcher)) as { variant?: string }).variant, "water");
       // One round at a time per channel, whatever it fetches; the reply names the running one.
-      assert.equal((await api(requester, { type: "requestRound", minutes: 2 })).status, 409);
       const waterBusy = (await (await slash({ text: "3" })).json()) as { text: string };
       assert.match(waterBusy.text, /^💧 Er loopt al een waterronde/);
       const waterViewer = waterStatus.round.spectatorCapability;

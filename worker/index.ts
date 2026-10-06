@@ -432,15 +432,6 @@ export default {
           } else {
             const command =
               request.method === "POST" ? await readBody(request) : null;
-            // A round creates a session: it spends the creation budget too.
-            if (
-              command &&
-              typeof command === "object" &&
-              "type" in command &&
-              command.type === "requestRound" &&
-              !(await creationAllowed(env, ip))
-            )
-              throw new RequestError(429, "rate_limited");
             response = await env.CHANNELS.getByName(capability.locator).access(
               capability.secret,
               command,
