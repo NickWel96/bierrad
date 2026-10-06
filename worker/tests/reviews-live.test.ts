@@ -274,9 +274,9 @@ test(
       assert.equal(review.reply_broadcast, false);
       assert.ok(!String(review.text).includes("<!channel>"));
       assert.ok(JSON.stringify(review.blocks).includes(JSON.stringify({ type: "rich_text_quote", elements: [{ type: "text", text }] })));
-      assert.match(String(review.text), /⭐⭐⭐⭐⭐ {2}4,5 gemiddeld · 2 beoordelingen/);
+      assert.match(String(review.text), /:star::star::star::star::bierrad_star_5: {2}4\.5 gemiddeld · 2 beoordelingen/);
       const rated = updates.at(-1)!;
-      assert.match(String(rated.text), /haalde koffie · ⭐⭐⭐⭐⭐ 4,5$/);
+      assert.match(String(rated.text), /haalde koffie · :star::star::star::star::bierrad_star_5: 4\.5$/);
       assert.ok(JSON.stringify(rated.blocks).includes("2 beoordelingen in de thread"));
       assert.ok(!JSON.stringify(rated).includes(requester));
       // Afterwards the session keeps no votes, texts, pseudonyms, key or link.

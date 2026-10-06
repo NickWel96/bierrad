@@ -117,11 +117,3 @@ export function validSubmission(
     )
   );
 }
-/** Whole stars for an average, as shown in Slack. */
-export function wholeStars(average: number): number {
-  return Math.min(5, Math.max(1, Math.round(average)));
-}
-export const averageFormat = new Intl.NumberFormat("nl-NL", {
-  minimumFractionDigits: 1,
-  maximumFractionDigits: 1,
-});
