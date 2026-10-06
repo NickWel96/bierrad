@@ -49,6 +49,14 @@ Open `http://127.0.0.1:5173/`, start live en open de gekopieerde kijklink in twe
 
 De lokale Worker gebruikt `.wrangler/state`; dit is genegeerd door Git en bevat tijdelijke testdata. Gebruik uitsluitend synthetische deelnemers tijdens ontwikkeling. Geen productieverbinding of Cloudflare-login nodig voor lokaal testen. Laat VITE_API_URL weg om zelfstandig gebruik zonder backend te testen.
 
+### Demo: Koffierad met nep-Slack
+
+```sh
+npm run demo
+```
+
+Eén commando, zonder Slack-app of secrets: bouwt de Worker, draait hem in Miniflare met een nep-Slack ervoor (poort 8787) en start Vite (poort 5173). Open `http://127.0.0.1:8787/__demo/`. Daar staat een nep-Slack-kanaal met een koffieoproep van zes verzonnen collega's. Klik op **Open de ronde**, log in via de nep-inlogpagina als een van de zes, zie het rad 10 seconden aftellen en draaien, en stem daarna. Knoppen op de demopagina slaan de wachtminuut voor het stemmen over, laten de anderen stemmen of starten een nieuwe ronde. De reviews verschijnen in de nep-thread. Alles staat in het geheugen; herstarten wist alles. De tijdhooks (`DemoSession`, `DemoChannel`) worden uitsluitend aan de in-memory demobundle toegevoegd en zitten niet in productie. Stop eerst een lopende `dev:worker` of `dev`, want de demo gebruikt dezelfde poorten.
+
 ## Validatie
 
 ```sh
