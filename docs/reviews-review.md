@@ -6,7 +6,7 @@ Implementatiereview tegen [SECURITY.md](../SECURITY.md#round-reviews--reviewed-e
 
 | Oppervlak | Autorisatie | Opmerkingen |
 | --- | --- | --- |
-| `POST /auth/slack/member` | Een geldige kanaallink (beheer-, aanvraag- of persoonlijke link) in een formulierbody | De Origin moet op de allowlist staan. De body is `application/x-www-form-urlencoded`, hooguit 1 KiB, met precies één veld `capability` en zonder query. Er gaan hooguit 30 logins per kanaal per minuut. Daarna volgt Sign in with Slack met het doel `member-<locator>` in de logincookie. |
+| `POST /auth/slack/member` | Een geldige kanaallink (beheer-, aanvraag- of persoonlijke link) in een formulierbody | De Origin moet op de allowlist staan; daarom gebruikt de frontend het referrerbeleid `strict-origin` en heeft het formulier geen `rel="noreferrer"` (anders sturen browsers `Origin: null`). De body is `application/x-www-form-urlencoded`, hooguit 1 KiB, met precies één veld `capability` en zonder query. Er gaan hooguit 30 logins per kanaal per minuut. Daarna volgt Sign in with Slack met het doel `member-<locator>` in de logincookie. |
 | `GET /auth/slack/callback` (doel member) | De bestaande OIDC-controles; alleen volwaardige leden van de workspace van de bot | Het gebruikerstoken wordt ingetrokken. De user-ID wordt alleen omgezet in een pseudoniem. De persoonlijke link komt alleen in het fragment terecht. Fouten komen uit op `#/koffie-login/<reden>`. |
 | `/api/channel`, rol `member` | De SHA-256-hash van een geheim van 256 bits, timing-safe vergeleken, met een vervaldatum | Heeft de rechten van de aanvraaglink, plus `review` en `logout`. Een member mag nooit beheren (403). |
 | `/api/channel` `setReviews` | Alleen de beheerder | Strikte vorm: `enabled` boolean, `minutes` ∈ {5, 10, 15, 30}. |

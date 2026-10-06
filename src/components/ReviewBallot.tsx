@@ -151,12 +151,14 @@ export function ReviewJoin({
   capability: string;
   viewLink?: string;
 }) {
+  // No rel="noreferrer": that would make the browser send "Origin: null",
+  // which the backend refuses. The page policy (strict-origin) sends the
+  // origin only; the capability travels in the body, never in a Referer.
   return (
     <form
       className="review-join"
       method="post"
       action={`${apiUrl}${path}`}
-      rel="noreferrer"
     >
       <input type="hidden" name="capability" value={capability} />
       <button type="submit" className="primary">
