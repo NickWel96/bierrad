@@ -1,0 +1,164 @@
+import { useState } from "react";
+import {
+  REVIEW_TEXT_MAX,
+  reviewLabels,
+  type ReviewBallot,
+  type ReviewSubmission,
+} from "../../shared/reviews";
+import type { ChannelVariant } from "../../shared/channel";
+
+const clock = new Intl.DateTimeFormat("nl-NL", {
+  timeZone: "Europe/Amsterdam",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+/** Stars per winner, an optional anonymous text, one submission. */
+export function ReviewBallotCard({
+  ballot,
+  variant,
+  channelName,
+  onSubmit,
+  onLater,
+}: {
+  ballot: ReviewBallot;
+  variant: ChannelVariant;
+  channelName?: string;
+  onSubmit: (submission: ReviewSubmission) => Promise<void>;
+  onLater: () => void;
+}) {
+  const [scores, setScores] = useState<(number | undefined)[]>(() =>
+    ballot.winners.map(() => undefined),
+  );
+  const [texts, setTexts] = useState(() => ballot.winners.map(() => ""));
+  const [error, setError] = useState("");
+  const [pending, setPending] = useState(false);
+  const labels = reviewLabels[variant];
+  const where = channelName ? `#${channelName}` : "het kanaal";
+  async function submit() {
+    const missing = ballot.winners.filter((_, i) => !scores[i]).map((w) => w.name);
+    if (missing.length) {
+      setError(`Geef ${missing.join(" en ")} eerst sterren.`);
+      return;
+    }
+    setPending(true);
+    setError("");
+    try {
+      await onSubmit({ scores: scores as number[], texts });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPending(false);
+    }
+  }
+  return (
+    <section className="review-card" aria-labelledby="review-title">
+      <header>
+        <h2 id="review-title">Hoe was het rondje?</h2>
+        <p className="helper">
+          Stemmen kan tot {clock.format(Date.parse(ballot.closesAt))}.
+        </p>
+      </header>
+      {ballot.winners.map((winner, i) => (
+        <fieldset key={winner.index} className="review-winner">
+          <legend>
+            <span>{winner.name}</span>
+            <small aria-live="polite">
+              {scores[i] ? labels[scores[i]! - 1] : "Kies sterren"}
+            </small>
+          </legend>
+          <div className="review-stars" role="radiogroup" aria-label={`Sterren voor ${winner.name}`}>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button
+                key={n}
+                type="button"
+                role="radio"
+                aria-checked={scores[i] === n}
+                aria-label={`${n} ${n === 1 ? "ster" : "sterren"}: ${labels[n - 1]}`}
+                className={scores[i] && n <= scores[i]! ? "on" : undefined}
+                onClick={() => {
+                  setScores((all) => all.map((s, j) => (j === i ? n : s)));
+                  setError("");
+                }}
+              >
+                ★
+              </button>
+            ))}
+          </div>
+          <label className="review-text">
+            <span className="sr-only">Review voor {winner.name} (optioneel)</span>
+            <textarea
+              maxLength={REVIEW_TEXT_MAX}
+              rows={2}
+              value={texts[i]}
+              placeholder="Wat vond je ervan? (optioneel)"
+              onChange={(e) =>
+                setTexts((all) => all.map((t, j) => (j === i ? e.target.value : t)))
+              }
+            />
+            <small>
+              {texts[i].length} / {REVIEW_TEXT_MAX}
+            </small>
+          </label>
+        </fieldset>
+      ))}
+      <p className="review-note">
+        Je review komt anoniem in de thread van {where}. Je kunt maar één keer
+        stemmen.
+      </p>
+      {error && (
+        <p className="review-error" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="review-actions">
+        <button type="button" onClick={onLater} disabled={pending}>
+          Later
+        </button>
+        <button type="button" className="primary" onClick={() => void submit()} disabled={pending}>
+          Verstuur beoordeling
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/** Thanks after voting; the votes themselves are never shown back. */
+export function ReviewThanks({ closesAt }: { closesAt: string }) {
+  return (
+    <p className="review-thanks" role="status">
+      ✓ Bedankt voor je stem! De reviews komen in Slack zodra iedereen gestemd
+      heeft, uiterlijk om {clock.format(Date.parse(closesAt))}.
+    </p>
+  );
+}
+
+/**
+ * Log in with Slack (to review after the round) or just watch. The channel
+ * link goes to the backend only in a POST body, never in a URL.
+ */
+export function ReviewJoin({
+  apiUrl,
+  capability,
+  viewLink,
+}: {
+  apiUrl: string;
+  capability: string;
+  viewLink?: string;
+}) {
+  return (
+    <form
+      className="review-join"
+      method="post"
+      action={`${apiUrl}/auth/slack/member`}
+      rel="noreferrer"
+    >
+      <input type="hidden" name="capability" value={capability} />
+      <button type="submit" className="primary">
+        Inloggen met Slack
+      </button>
+      {viewLink && <a href={viewLink}>Alleen kijken</a>}
+      <small>Log in om na afloop de haler te beoordelen.</small>
+    </form>
+  );
+}

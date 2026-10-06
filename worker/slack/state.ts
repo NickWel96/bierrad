@@ -16,6 +16,10 @@ export const MAX_CARD_ATTEMPTS = 3;
  */
 export type CallCard = CallOutcome & {
   startAt: number;
+  /** While the winner can be reviewed: the call invites to and links the round. */
+  reviewUntil?: number;
+  /** After the review closed: per winner, null when nobody reviewed them. */
+  ratings?: ({ average: number; count: number } | null)[];
   status: "pending" | "updating" | "updated" | "failed";
   readyAt: number;
   attempts: number;

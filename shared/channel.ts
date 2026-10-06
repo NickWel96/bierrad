@@ -1,5 +1,6 @@
 /** Public contract for channel-bound Koffierad wheels. No secrets or Slack IDs. */
 import type { WheelVariant } from "./variant";
+import type { ReviewBallot, ReviewSettings } from "./reviews";
 /** What a channel round fetches; one binding serves both. */
 export type ChannelVariant = Extract<WheelVariant, "coffee" | "water">;
 export const channelVariants: readonly ChannelVariant[] = ["coffee", "water"];
@@ -42,9 +43,12 @@ export interface ChannelRound {
   startAt: string;
   spectatorCapability: string;
   active: boolean;
+  /** Whether this round's winner can be reviewed. */
+  reviews?: boolean;
 }
 export interface ChannelStatus {
-  role: "admin" | "requester";
+  /** `member`: a personal link from Sign in with Slack; requests rounds and reviews. */
+  role: "admin" | "requester" | "member";
   /** The theme to show: the latest round's, coffee before any round. */
   variant?: ChannelVariant;
   defaultMinutes: number;
@@ -55,17 +59,33 @@ export interface ChannelStatus {
   viewerCapability?: string;
   /** Channel name from the last signed `/koffierad` or `/waterrad`, without `#`; display only. */
   channelName?: string;
+  reviews?: ReviewSettings;
+  /** Personal links only: about this person, never about anyone else. */
+  member?: {
+    participating?: boolean;
+    ballot?: ReviewBallot;
+  };
 }
 export type ChannelCommand =
   /** Without a variant the round is coffee, as before water existed. */
-  | { type: "requestRound"; minutes: number; variant?: ChannelVariant }
+  | {
+      type: "requestRound";
+      minutes: number;
+      variant?: ChannelVariant;
+      /** Overrides the channel's default for this round. */
+      reviews?: boolean;
+    }
   | { type: "setDefaultMinutes"; minutes: number }
+  | { type: "setReviews"; enabled: boolean; minutes: number }
+  | { type: "review"; drawId: string; scores: number[]; texts: string[] }
+  | { type: "logout" }
   | { type: "rotateRequestLink" }
   | { type: "unbind" };
 export type ChannelCommandResult =
   | { type: "status"; status: ChannelStatus }
   | { type: "rotated"; requestCapability: string; status: ChannelStatus }
   | { type: "unbound" }
+  | { type: "loggedOut" }
   /** All a view-only word link gets: the latest round, no commands. */
   | {
       type: "view";

@@ -41,6 +41,32 @@ export async function readBody(request: Request): Promise<unknown> {
     reader.releaseLock();
   }
 }
+/** A small form body, read with a byte bound; anything larger is refused. */
+export async function readFormBody(
+  request: Request,
+  limit: number,
+): Promise<string> {
+  const reader = request.body?.getReader();
+  if (!reader) return "";
+  let size = 0,
+    text = "";
+  const decoder = new TextDecoder();
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      size += chunk.value.byteLength;
+      if (size > limit) {
+        await reader.cancel();
+        return "";
+      }
+      text += decoder.decode(chunk.value, { stream: true });
+    }
+    return text + decoder.decode();
+  } finally {
+    reader.releaseLock();
+  }
+}
 /** Browser navigation redirect; never leaks the callback URL as a referrer. */
 export function redirect(location: string, cookie: string): Response {
   return new Response(null, {

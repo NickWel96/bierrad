@@ -13,8 +13,15 @@ export type ChannelBindFailure =
   | "unavailable"
   | "busy"
   | "not_in_channel";
+export type MemberLoginFailure =
+  | "denied"
+  | "forbidden"
+  | "expired"
+  | "unavailable"
+  | "busy";
 export type ChannelRoute =
   | { page: "bind"; failure?: ChannelBindFailure }
+  | { page: "memberFailure"; failure: MemberLoginFailure }
   | { page: "wheel"; capability: string; requestCapability?: string }
   | { page: "view"; capability: string };
 /** Channel links live only in the fragment, never in storage or requests to Pages. */
@@ -28,6 +35,11 @@ export function parseChannelRoute(hash: string): ChannelRoute | null {
       page: "bind",
       ...(bind[1] ? { failure: bind[1] as ChannelBindFailure } : {}),
     };
+  const member = /^#\/koffie-login\/(denied|forbidden|expired|unavailable|busy)$/.exec(
+    hash,
+  );
+  if (member)
+    return { page: "memberFailure", failure: member[1] as MemberLoginFailure };
   const request = new RegExp(`^#/koffie/(${hex})$`).exec(hash);
   if (request) return { page: "wheel", capability: request[1] };
   const view = new RegExp(`^#/koffie/(${words})$`).exec(hash);
@@ -44,6 +56,10 @@ export function channelLink(requestCapability: string): string {
 export function channelViewLink(viewerCapability: string): string {
   return `${location.host}${location.pathname}#/koffie/${viewerCapability}`;
 }
+/** The word link as a route, to open it here for just watching. */
+export function channelViewRoute(viewerCapability: string): string {
+  return `#/koffie/${viewerCapability}`;
+}
 export function channelBindUrl(apiUrl: string, channelId: string): string {
   return `${apiUrl}/auth/slack/channel/${channelId}`;
 }
@@ -58,6 +74,11 @@ const messages: Record<string, string> = {
   unavailable:
     "Deze link werkt niet meer. Vraag de beheerder van het kanaal om een nieuwe aanvraaglink.",
   forbidden: "Alleen de beheerder van dit Koffierad kan dit aanpassen.",
+  review_closed: "Stemmen is voorbij. De reviews staan in Slack.",
+  review_done: "Je hebt al gestemd. Bedankt!",
+  review_forbidden:
+    "Je kunt deze ronde niet beoordelen: je deed niet mee of je bent zelf de haler.",
+  invalid: "Geef alle halers sterren; een review mag hooguit 280 tekens zijn.",
 };
 export class ChannelApiError extends Error {
   constructor(public code: string) {

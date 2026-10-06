@@ -6,6 +6,8 @@ export default defineConfig(({ mode, command }) => {
     process.env.VITE_API_URL ??
     loadEnv(mode, process.cwd(), "VITE_").VITE_API_URL;
   let backend = "";
+  // Forms only post to the backend (Slack login), which redirects to Slack.
+  let forms = "'none'";
   if (api) {
     const url = new URL(api);
     const local =
@@ -25,12 +27,13 @@ export default defineConfig(({ mode, command }) => {
       );
     }
     backend = `${url.origin} ${url.origin.replace(/^http/, "ws")}`;
+    forms = `'self' ${url.origin} https://slack.com`;
   }
   const csp = [
     "default-src 'self'",
     "base-uri 'self'",
     "object-src 'none'",
-    "form-action 'none'",
+    `form-action ${forms}`,
     `script-src 'self'${dev ? " 'unsafe-inline'" : ""}`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",

@@ -12,6 +12,7 @@ import {
   advanceDraw,
 } from "../src/domain/drawEngine";
 import { getCapabilities } from "../src/domain/capabilities";
+import { reviewDeadline, reviewProgress, type RoundReview } from "./reviews";
 import { validateParticipants } from "../src/utils/participants";
 import type { BeerWheelSession, ClientRole } from "../src/domain/models";
 import type { ScheduledDraw, PublicBeerWheelSession } from "../shared/protocol";
@@ -49,6 +50,8 @@ export interface StoredSession {
   slack?: SlackState;
   scheduledDraw?: ScheduledDraw;
   scheduleCheckUntil?: number;
+  /** Channel rounds with reviews only. */
+  review?: RoundReview;
 }
 export function newSession(
   hostHash: string,
@@ -106,6 +109,7 @@ export function publicSession(record: StoredSession): PublicBeerWheelSession {
           },
         }
       : {}),
+    ...(reviewProgress(record) ? { review: reviewProgress(record) } : {}),
     expiresAt: new Date(record.expiresAt).toISOString(),
     revision: record.revision,
   };
@@ -189,6 +193,8 @@ export function nextDeadline(record: StoredSession): number {
   if (slack?.job?.status === "pending") times.push(slack.job.readyAt);
   if (slack?.job?.status === "posting")
     times.push(slack.job.attemptedAt! + 120000);
+  const review = reviewDeadline(record);
+  if (review !== undefined) times.push(review);
   if (slack?.card?.status === "pending") times.push(slack.card.readyAt);
   if (slack?.card?.status === "updating")
     times.push(slack.card.attemptedAt! + 120000);

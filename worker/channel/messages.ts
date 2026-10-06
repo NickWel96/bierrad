@@ -1,9 +1,10 @@
 import { channelCopy, type ChannelVariant } from "../../shared/channel";
 import { themes } from "../../shared/variant";
+import { averageFormat, wholeStars } from "../../shared/reviews";
 import { clock } from "../slack/state";
 
 type Element =
-  | { type: "text"; text: string; style?: { bold: true } }
+  | { type: "text"; text: string; style?: { bold: true; italic?: true } }
   | { type: "link"; url: string; text: string }
   | { type: "user"; user_id: string };
 
@@ -89,6 +90,8 @@ export function callBody(
   spectatorLink: string,
   startAt: number,
   variant: ChannelVariant = "coffee",
+  /** With reviews the link opens the channel page, where people can log in. */
+  linkText = "Kijk live mee",
 ) {
   const theme = themes[variant];
   const { elements, blocks } = card(
@@ -99,7 +102,7 @@ export function callBody(
         type: "text",
         text: `Klik op ${theme.icon} hieronder om mee te doen.\n`,
       },
-      { type: "link", url: spectatorLink, text: "Kijk live mee" },
+      { type: "link", url: spectatorLink, text: linkText },
     ],
     `Het ${theme.name} kiest één ${theme.drink}haler.`,
   );
@@ -113,8 +116,19 @@ export type CallOutcome =
       /** Server-frozen Slack identities in winner order; never from a client. */
       mentionIds: (string | null)[];
       participants: number;
+      /** While the winner can be reviewed. */
+      reviewUntil?: number;
+      /** After the review closed: per winner, null when nobody reviewed them. */
+      ratings?: ({ average: number; count: number } | null)[];
     }
   | { kind: "empty" | "unreadable" };
+const stars = (average: number) => "⭐".repeat(wholeStars(average));
+/** Server-frozen identities only; anything else stays literal text. */
+function mention(name: string, id: string | null | undefined): Element {
+  return id && /^[UW][A-Z0-9]{8,20}$/.test(id) && id !== "USLACKBOT"
+    ? { type: "user", user_id: id }
+    : { type: "text", text: name };
+}
 /**
  * The call message rewritten once the round is over, so the channel keeps one
  * message per round. Details stay in the thread; the call has no link left.
@@ -125,6 +139,8 @@ export function settledCallBody(
   startAt: number,
   variant: ChannelVariant,
   outcome: CallOutcome,
+  /** The channel link, only while the round can still be reviewed. */
+  reviewLink?: string,
 ) {
   const theme = themes[variant],
     copy = channelCopy[variant];
@@ -133,21 +149,46 @@ export function settledCallBody(
   let names: string[] = [];
   if (outcome.kind === "winner") {
     names = outcome.names;
+    const ratings = outcome.ratings;
     status = [{ type: "text", text: "🏆 " }];
     outcome.names.forEach((name, index) => {
       if (index) status.push({ type: "text", text: " · " });
-      const id = outcome.mentionIds[index];
-      status.push(
-        id && /^[UW][A-Z0-9]{8,20}$/.test(id) && id !== "USLACKBOT"
-          ? { type: "user", user_id: id }
-          : { type: "text", text: name },
-      );
+      status.push(mention(name, outcome.mentionIds[index]));
+      const rating = ratings?.[index];
+      if (rating && outcome.names.length > 1)
+        status.push({
+          type: "text",
+          text: ` ${stars(rating.average)} ${averageFormat.format(rating.average)}`,
+        });
     });
+    const many = outcome.names.length > 1;
     status.push({
       type: "text",
-      text: ` ${outcome.names.length === 1 ? "haalt" : "halen"} ${theme.drink}`,
+      text: ratings
+        ? ` ${many ? "haalden" : "haalde"} ${theme.drink}`
+        : ` ${many ? "halen" : "haalt"} ${theme.drink}`,
     });
+    const single = ratings?.length === 1 ? ratings[0] : undefined;
+    if (single)
+      status.push({
+        type: "text",
+        text: ` · ${stars(single.average)} ${averageFormat.format(single.average)}`,
+      });
+    if (!ratings && outcome.reviewUntil && reviewLink)
+      status.push(
+        {
+          type: "text",
+          text: `\n⭐ Beoordeel de ${many ? "halers" : "haler"} tot ${clock.format(outcome.reviewUntil)}: `,
+        },
+        { type: "link", url: reviewLink, text: "Open de ronde" },
+      );
     context = `${outcome.participants} ${outcome.participants === 1 ? "deed" : "deden"} mee`;
+    if (ratings) {
+      const count = Math.max(0, ...ratings.map((r) => r?.count ?? 0));
+      context += count
+        ? ` · ${count} ${count === 1 ? "beoordeling" : "beoordelingen"} in de thread`
+        : " · geen beoordelingen";
+    }
   } else
     status = [
       {
@@ -165,6 +206,69 @@ export function settledCallBody(
     text: fallback(elements, names),
     blocks,
     ...options,
+  };
+}
+/** The anonymous reviews of a round, as one reply in its thread. */
+export function reviewBody(
+  channelId: string,
+  threadTs: string,
+  results: {
+    name: string;
+    mentionId: string | null;
+    average: number;
+    count: number;
+    texts: string[];
+  }[],
+) {
+  const sections: Record<string, unknown>[] = [];
+  const plain: string[] = [];
+  results.forEach((result, index) => {
+    const line: Element[] = [
+      { type: "text", text: `${index ? "\n" : ""}⭐ Reviews voor ` },
+      mention(result.name, result.mentionId),
+      { type: "text", text: `\n${stars(result.average)}  ` },
+      {
+        type: "text",
+        text: averageFormat.format(result.average),
+        style: { bold: true },
+      },
+      {
+        type: "text",
+        text: ` gemiddeld · ${result.count} ${result.count === 1 ? "beoordeling" : "beoordelingen"}`,
+      },
+    ];
+    sections.push({ type: "rich_text_section", elements: line });
+    plain.push(
+      `${index ? "\n" : ""}⭐ Reviews voor ${result.name}\n${stars(result.average)}  ${averageFormat.format(result.average)} gemiddeld · ${result.count} ${result.count === 1 ? "beoordeling" : "beoordelingen"}`,
+    );
+    // Anonymous texts as literal quotes; Slack never parses them.
+    for (const text of result.texts) {
+      sections.push({
+        type: "rich_text_quote",
+        elements: [{ type: "text", text }],
+      });
+      plain.push(`> ${text}`);
+    }
+  });
+  return {
+    channel: channelId,
+    thread_ts: threadTs,
+    text: escape(plain.join("\n")),
+    blocks: [
+      { type: "rich_text", elements: sections },
+      {
+        type: "context",
+        elements: [
+          {
+            type: "plain_text",
+            text: "Anoniem · de stemmen zijn gewist",
+            emoji: true,
+          },
+        ],
+      },
+    ],
+    ...options,
+    reply_broadcast: false,
   };
 }
 /** Posting this also proves the bot is a member of the channel. */

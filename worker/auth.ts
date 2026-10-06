@@ -62,3 +62,25 @@ export function equalHash(a: string, b: string): boolean {
     timingSafeEqual(new TextEncoder().encode(a), new TextEncoder().encode(b))
   );
 }
+/**
+ * Stable per-channel pseudonym of a Slack user: HMAC-SHA256 with a random key
+ * of that binding, so stored values cannot be linked to an identity once the
+ * key is gone.
+ */
+export async function pseudonym(keyHex: string, userId: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    Uint8Array.from(keyHex.match(/../g)!, (h) => parseInt(h, 16)),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const mac = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(`koffierad-member:${userId}`),
+  );
+  return Array.from(new Uint8Array(mac), (b) =>
+    b.toString(16).padStart(2, "0"),
+  ).join("");
+}

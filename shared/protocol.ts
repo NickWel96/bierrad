@@ -1,3 +1,4 @@
+import type { ReviewProgress } from "./reviews";
 import type { WheelVariant } from "./variant";
 import type {
   DrawInstruction,
@@ -45,6 +46,8 @@ export interface PublicBeerWheelSession {
   revision: number;
   slack?: SlackHostStatus;
   scheduledDraw?: ScheduledDraw;
+  /** Counts only, while a channel round can be reviewed. */
+  review?: ReviewProgress;
 }
 export type HostCommand =
   | { type: "setParticipants"; names: string[] }

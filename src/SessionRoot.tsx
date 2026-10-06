@@ -25,6 +25,7 @@ import { parseChannelRoute } from "./sessions/ChannelClient";
 import { isChannelVariant } from "../shared/channel";
 import {
   ChannelBindPage,
+  ChannelMemberFailurePage,
   ChannelViewPage,
   ChannelWheelPage,
 } from "./components/ChannelPages";
@@ -42,6 +43,8 @@ export function SessionRoot() {
       <VariantContext.Provider value="coffee">
         {channel.page === "bind" ? (
           <ChannelBindPage key={hash} failure={channel.failure} />
+        ) : channel.page === "memberFailure" ? (
+          <ChannelMemberFailurePage key={hash} failure={channel.failure} />
         ) : channel.page === "view" ? (
           <ChannelViewPage key={hash} capability={channel.capability} />
         ) : (
