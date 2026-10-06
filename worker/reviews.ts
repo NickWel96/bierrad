@@ -6,6 +6,9 @@ import {
 } from "../shared/reviews";
 import { RequestError, type StoredSession } from "./session";
 
+/** Voting opens this long after the last reveal. */
+export const REVIEW_DELAY_MS = 60000;
+
 /**
  * Reviews of one channel round. Only temporary: pseudonyms, the key and the
  * link are erased when the review closes, the votes once it has been posted,
@@ -19,7 +22,7 @@ export interface RoundReview {
   link?: string;
   status: "waiting" | "open" | "closed";
   drawId?: string;
-  /** The last reveal: no ballot may name a winner before the wheels stop. */
+  /** A minute after the last reveal: no ballot names a winner before the wheels stop, and the finale gets its moment. */
   opensAt?: number;
   closesAt?: number;
   winners?: {
@@ -79,7 +82,7 @@ export function openReview(
     return slackId ? (pseudonyms.get(slackId) ?? null) : null;
   };
   review.drawId = draw.id;
-  review.opensAt = end;
+  review.opensAt = end + REVIEW_DELAY_MS;
   review.winners = draw.spins.map((spin) => {
     const slackId = slackIds.get(spin.winnerId) ?? null;
     return {
@@ -104,7 +107,7 @@ export function openReview(
   review.totals = review.winners.map(() => ({ sum: 0, count: 0, texts: [] }));
   // Always closes before the session ends, whatever was configured.
   review.closesAt = Math.min(
-    end + review.minutes * 60000,
+    review.opensAt + review.minutes * 60000,
     record.expiresAt - 60000,
   );
   review.status = "open";

@@ -227,8 +227,8 @@ export function ChannelWheelPage({
       window.removeEventListener("focus", refresh);
     };
   }, [run]);
-  // A personal link asks for its ballot right after the finale instead of
-  // waiting for the next poll; a second try covers a slightly late server.
+  // Voting opens a minute after the finale: a personal link asks for its
+  // ballot right then instead of waiting for the next poll, and once more.
   const isMember = status?.role === "member";
   useEffect(() => {
     if (!live || !isMember) return;
@@ -237,7 +237,7 @@ export function ChannelWheelPage({
     const unsubscribe = live.subscribe(() => {
       const now = live.getSnapshot().session.state === "finished";
       if (now && !finished)
-        for (const delay of [3000, 8000])
+        for (const delay of [61000, 66000])
           timers.push(setTimeout(() => void run().catch(() => {}), delay));
       finished = now;
     });

@@ -33,7 +33,7 @@ test(
       edit(fn) { const r = JSON.parse(this.ctx.storage.sql.exec('SELECT value FROM session WHERE singleton = 1').one().value); fn(r); this.ctx.storage.sql.exec('UPDATE session SET value = ? WHERE singleton = 1', JSON.stringify(r)); }
       stored() { return this.ctx.storage.sql.exec('SELECT value FROM session WHERE singleton = 1').one().value; }
       async due() { this.edit(r => { r.scheduledDraw.startAt = new Date(Date.now() + 4000).toISOString(); }); return this.alarm(); }
-      land() { this.edit(r => { const d = r.session.activeDraw; const end = Math.max(...d.spins.map(s => Date.parse(s.startAt) + s.durationMs)); const shift = end - Date.now() + 1000; const move = t => new Date(Date.parse(t) - shift).toISOString(); d.startAt = move(d.startAt); for (const s of d.spins) s.startAt = move(s.startAt); if (r.review) { r.review.opensAt -= shift; r.review.closesAt -= shift; } if (r.slack.job) r.slack.job.readyAt -= shift; if (r.slack.card) r.slack.card.readyAt -= shift; }); return this.alarm(); }
+      land() { this.edit(r => { const d = r.session.activeDraw; const end = Math.max(...d.spins.map(s => Date.parse(s.startAt) + s.durationMs)); const shift = end - Date.now() + 1000; const move = t => new Date(Date.parse(t) - shift).toISOString(); d.startAt = move(d.startAt); for (const s of d.spins) s.startAt = move(s.startAt); if (r.review) { r.review.opensAt -= shift + 60000; r.review.closesAt -= shift + 60000; } if (r.slack.job) r.slack.job.readyAt -= shift; if (r.slack.card) r.slack.card.readyAt -= shift; }); return this.alarm(); }
       async run() { return this.alarm(); }
     }
     export class TestChannel extends ChannelWheel {

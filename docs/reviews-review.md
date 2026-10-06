@@ -22,11 +22,11 @@ Implementatiereview tegen [SECURITY.md](../SECURITY.md#round-reviews--reviewed-e
 
 Reviews staan standaard aan, met 15 minuten stemtijd, ook voor bestaande koppelingen zonder opgeslagen keuze (gevraagd door de eigenaar op 2026-10-06). Daardoor linkt een oproep standaard naar de kanaalpagina in plaats van naar de woordlink. Dat is dezelfde link die al in het koppelbericht staat, dus het publiek wordt niet groter. De beheerder kan reviews uitzetten, en per aanvraag kan het ook.
 
-Een persoonlijke pagina vraagt het stemformulier 3 en 8 seconden na de finale op, en daarnaast elke 10 seconden. Het formulier verschijnt dus een paar seconden nadat het rad gestopt is, na het feestelijke moment.
+Stemmen opent een minuut na de finale (gevraagd door de eigenaar), en de stemtijd telt vanaf dat moment. Een persoonlijke pagina vraagt het stemformulier op dat moment op en vijf seconden later nog eens; daarnaast pollt hij elke 10 seconden.
 
 ## Gecontroleerde risico's
 
-- **Winnaar uitlekken:** stembiljetten openen pas na de laatste onthulling, en de server weigert te vroege stemmen.
+- **Winnaar uitlekken:** stembiljetten openen pas een minuut na de laatste onthulling, en de server weigert te vroege stemmen.
 - **Dubbel stemmen:** één stem per pseudoniem, binnen het Durable Object, zonder await tussen controle en schrijven. Een nieuwe login geeft hetzelfde pseudoniem en dus geen nieuwe stem.
 - **Op jezelf stemmen:** de winnaar staat niet op de lijst van wie mag stemmen (403), en een stembiljet bevat nooit jezelf.
 - **Injectie in Slack:** de teksten staan in `rich_text_quote` als tekstelementen, met `parse: none` en een ge-escapete fallback. `<!channel>`, mentions en links blijven letterlijke tekst. De invoer wordt opgeschoond: geen stuurtekens en geen bidi-overrides.

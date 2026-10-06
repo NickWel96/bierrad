@@ -53,10 +53,12 @@ function drawnRound(minutes = 10) {
   return { r, winner, voters, end };
 }
 
-test("reviews open after the last reveal, for every Slack participant except the winner", () => {
+test("reviews open a minute after the last reveal, for every Slack participant except the winner", () => {
   const { r, winner, voters, end } = drawnRound();
   assert.equal(r.review!.status, "open");
   assert.deepEqual(r.review!.eligible!.sort(), voters.map((v) => alias(v.slack)).sort());
+  const spin = r.session.activeDraw!.spins[0];
+  assert.equal(end, Date.parse(spin.startAt) + spin.durationMs + 60000);
   assert.equal(r.review!.closesAt, end + 10 * 60000);
   assert.equal(r.slack!.card!.kind === "winner" && r.slack!.card!.reviewUntil, end + 10 * 60000);
   // Before the wheels stop no ballot may name the winner.
