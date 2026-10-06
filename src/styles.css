@@ -1300,6 +1300,14 @@ footer b {
   max-width: 100%;
   animation: reveal 0.5s ease-out;
 }
+.spectator-status .spectator-result-line {
+  margin: 0;
+  font-size: clamp(16px, 2.4vh, 26px);
+  color: #6b6455;
+}
+.spectator-result-line strong {
+  color: #302e26;
+}
 .spectator-result .eyebrow {
   font-size: clamp(12px, 1.7vh, 18px);
 }
@@ -1422,32 +1430,11 @@ footer b {
   text-align: left;
   font-weight: 600;
 }
-.minute-choices {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-  border: 0;
-  padding: 0;
-  margin: 0;
-}
-.minute-choices legend {
-  width: 100%;
-  margin-bottom: 8px;
-  font-weight: 600;
-}
-.minute-choices button,
 .channel-admin button {
   border: 1px solid #d4c7a7;
   border-radius: 20px;
   padding: 8px 14px;
   background: #fff8e9;
-}
-.minute-choices button[aria-pressed="true"] {
-  background: #302e26;
-  border-color: #302e26;
-  color: #fffdf8;
-  font-weight: 700;
 }
 .channel-admin {
   margin-top: 20px;
@@ -1494,20 +1481,6 @@ footer b {
   font-size: 14px;
   text-align: center;
 }
-.channel-strip-request {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-}
-.channel-strip select {
-  padding: 6px 8px;
-  border: 1px solid #d4c7a7;
-  border-radius: 8px;
-  background: #fffdf8;
-  font: inherit;
-}
 .channel-strip .primary {
   padding: 9px 16px;
   box-shadow: 0 3px 0 #302e26;
@@ -1518,24 +1491,6 @@ footer b {
 [data-variant="water"] .channel-strip,
 [data-variant="water"] .channel-page code {
   background: #d9eef3;
-}
-/* Each request button wears its own round's colours, whatever the page shows. */
-.channel-request .spin-button[data-variant="coffee"] {
-  background: #724831;
-  color: #fff8ee;
-  border-color: #593825;
-  box-shadow: 0 5px 0 #442d22;
-}
-.channel-request .spin-button[data-variant="water"] {
-  background: #1f6f8b;
-  color: #f4fbfd;
-  border-color: #185a71;
-  box-shadow: 0 5px 0 #12475a;
-}
-.channel-view-link code,
-code.channel-view-link {
-  user-select: all;
-  overflow-wrap: anywhere;
 }
 
 /* Round reviews: log in or watch, the ballot and its progress. */
@@ -1565,13 +1520,6 @@ code.channel-view-link {
 .channel-strip .review-join .primary {
   padding: 8px 14px;
 }
-.review-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  font-weight: 600;
-}
 .review-progress {
   font-weight: 600;
 }
@@ -1597,6 +1545,22 @@ code.channel-view-link {
 .member-hint {
   flex-basis: 100%;
   color: #6b6455;
+}
+details.member-hint {
+  flex-basis: auto;
+  font-size: 12px;
+}
+details.member-hint[open] {
+  flex-basis: 100%;
+}
+details.member-hint summary {
+  display: inline;
+  cursor: pointer;
+  font-size: 14px;
+  list-style: none;
+}
+details.member-hint summary::-webkit-details-marker {
+  display: none;
 }
 .link-button {
   border: 0;

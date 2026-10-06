@@ -7,10 +7,7 @@ import {
 } from "react";
 import {
   channelCopy,
-  channelVariants,
-  DEFAULT_ROUND_MINUTES,
   MAX_ROUND_MINUTES,
-  ROUND_MINUTE_CHOICES,
   parseChannelInput,
   type ChannelCommand,
   type ChannelRound,
@@ -135,9 +132,9 @@ export function ChannelBindPage({ failure }: { failure?: ChannelBindFailure }) {
           <p>Koppelen is hier nog niet ingesteld.</p>
         )}
         <p className="helper">
-          Iedere afdeling kan een eigen kanaal koppelen. Wie de aanvraaglink heeft
-          of <code>/koffierad</code> of <code>/waterrad</code> typt in het kanaal,
-          kan een koffie- of waterronde starten.
+          Iedere afdeling kan een eigen kanaal koppelen. Wie <code>/koffierad</code>{" "}
+          of <code>/waterrad</code> typt in het kanaal, start een koffie- of
+          waterronde.
         </p>
         <p>
           <a href="#/coffee">Liever handmatig draaien</a>
@@ -173,7 +170,10 @@ export function ChannelMemberFailurePage({
   );
 }
 
-/** Request a round (everyone with the link) and, for admins, manage the binding. */
+/**
+ * The channel's fixed wheel: watch, log in to review and, for admins, manage the
+ * binding. Rounds start in Slack with /koffierad or /waterrad, not here.
+ */
 export function ChannelWheelPage({
   capability,
   requestCapability,
@@ -183,11 +183,9 @@ export function ChannelWheelPage({
 }) {
   const api = configuredApiUrl();
   const [status, setStatus] = useState<ChannelStatus>();
-  const [minutes, setMinutes] = useState<number>();
   const [pending, setPending] = useState(false);
   const [notice, setNotice] = useState("");
   const [gone, setGone] = useState<false | "gone" | "loggedOut">(false);
-  const [withReviews, setWithReviews] = useState<boolean>();
   /** A ballot put aside with "Later"; it stays one click away. */
   const [later, setLater] = useState<string>();
   const live = useRoundController(api, status?.round?.spectatorCapability);
@@ -291,30 +289,7 @@ export function ChannelWheelPage({
       </ChannelTheme>
     );
   const variant = status.round?.variant ?? status.variant ?? "coffee";
-  const chosen = minutes ?? status.defaultMinutes ?? DEFAULT_ROUND_MINUTES;
-  const choices = [
-    ...new Set([...ROUND_MINUTE_CHOICES, status.defaultMinutes]),
-  ].sort((a, b) => a - b);
   const reviews = status.reviews ?? DEFAULT_REVIEW_SETTINGS;
-  const reviewed = withReviews ?? reviews.enabled;
-  const request = (kind: ChannelVariant) =>
-    void act({
-      type: "requestRound",
-      minutes: chosen,
-      variant: kind,
-      reviews: reviewed,
-    });
-  const reviewToggle = (
-    <label className="review-toggle">
-      <input
-        type="checkbox"
-        checked={reviewed}
-        disabled={pending}
-        onChange={(e) => setWithReviews(e.target.checked)}
-      />{" "}
-      ⭐ Met reviews
-    </label>
-  );
   const member = status.role === "member";
   const ballot = status.member?.ballot;
   const submit = async (submission: { scores: number[]; texts: string[] }) => {
@@ -344,10 +319,11 @@ export function ChannelWheelPage({
       >
         Uitloggen
       </button>
-      <small className="member-hint">
+      <details className="member-hint">
+        <summary aria-label="Over deze link">ⓘ</summary>
         Dit is jouw persoonlijke link, 30 dagen geldig: zet hem in je
         bladwijzers en deel hem niet.
-      </small>
+      </details>
     </div>
   );
   const ballotCard = member && ballot && !ballot.submitted && later !== ballot.drawId && (
@@ -371,6 +347,9 @@ export function ChannelWheelPage({
           : undefined
       }
     />
+  );
+  const viewLink = status.viewerCapability && (
+    <ViewLinkButton capability={status.viewerCapability} setNotice={setNotice} />
   );
   const admin = status.role === "admin" && (
     <ChannelAdmin
@@ -400,44 +379,13 @@ export function ChannelWheelPage({
                 {themes[variant].icon} onder de oproep in Slack om mee te doen.
               </span>
             ) : (
-              <span className="channel-strip-request">
-                {reviewToggle}
-                <label>
-                  Nieuwe ronde over{" "}
-                  <select
-                    value={chosen}
-                    disabled={pending}
-                    onChange={(e) => setMinutes(Number(e.target.value))}
-                  >
-                    {choices.map((m) => (
-                      <option key={m} value={m}>
-                        {m} min
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {channelVariants.map((kind) => (
-                  <button
-                    key={kind}
-                    className="primary"
-                    disabled={pending || status.roundsLeft === 0}
-                    onClick={() => request(kind)}
-                  >
-                    {themes[kind].icon} {roundLabel(kind)}
-                  </button>
-                ))}
-              </span>
+              <span>Typ /koffierad of /waterrad in het kanaal voor een nieuwe ronde.</span>
             )}
+            {viewLink}
             {!member && <ReviewProgressNote controller={live} />}
             {notice && <small role="status">{notice}</small>}
             {memberBar}
             {join}
-            {status.viewerCapability && (
-              <small className="channel-view-link">
-                Op een ander scherm meekijken:{" "}
-                <code>{channelViewLink(status.viewerCapability)}</code>
-              </small>
-            )}
           </div>
           {ballotCard && <div className="review-overlay">{ballotCard}</div>}
           <ChannelLive key={status.round.spectatorCapability} controller={live} />
@@ -454,54 +402,18 @@ export function ChannelWheelPage({
         <h1>Tijd voor koffie of water?</h1>
         <section className="channel-request">
           <p>
-            Er komt een oproep in het Slack-kanaal. Wie op ☕ of 💧 klikt, doet mee.
-            Na de wachttijd draait het rad hier en kiest het één haler. Deze pagina
-            blijft altijd het rad van dit kanaal.
+            Typ <code>/koffierad</code> of <code>/waterrad</code> in het
+            Slack-kanaal, bijvoorbeeld <code>/waterrad 10</code> voor tien
+            minuten. Wie op ☕ of 💧 onder de oproep klikt, doet mee. Na de
+            wachttijd draait het rad hier vanzelf en kiest het één haler.
           </p>
-          <fieldset className="minute-choices">
-            <legend>Het rad draait over</legend>
-            {choices.map((m) => (
-              <button
-                key={m}
-                type="button"
-                aria-pressed={m === chosen}
-                onClick={() => setMinutes(m)}
-              >
-                {m} min
-              </button>
-            ))}
-          </fieldset>
-          {reviewToggle}
-          {channelVariants.map((kind) => (
-            <button
-              key={kind}
-              className="primary spin-button"
-              data-variant={kind}
-              disabled={pending || status.roundsLeft === 0}
-              onClick={() => request(kind)}
-            >
-              {themes[kind].icon} VRAAG EEN {channelCopy[kind].round.toUpperCase()} AAN
-            </button>
-          ))}
           {status.roundsLeft === 0 && (
             <p className="helper">Vandaag zijn er genoeg rondes geweest. Morgen weer!</p>
           )}
+          {viewLink}
         </section>
         {notice && <p role="status">{notice}</p>}
         {join}
-        <p className="helper">
-          Liever vanuit Slack? Typ <code>/koffierad</code> of{" "}
-          <code>/waterrad</code> in het kanaal, met bijvoorbeeld{" "}
-          <code>/waterrad 10</code> voor tien minuten.
-        </p>
-        {status.viewerCapability && (
-          <p className="helper">
-            Op een ander scherm meekijken, zonder rondes te kunnen starten? Typ daar{" "}
-            <code className="channel-view-link">
-              {channelViewLink(status.viewerCapability)}
-            </code>
-          </p>
-        )}
         {admin}
       </div>
     </ChannelTheme>
@@ -670,6 +582,30 @@ function ChannelLive({ controller }: { controller?: RemoteSessionController }) {
   );
 }
 
+/** The word link for a TV or second screen: copied, and shown to type over. */
+function ViewLinkButton({
+  capability,
+  setNotice,
+}: {
+  capability: string;
+  setNotice: (text: string) => void;
+}) {
+  const link = channelViewLink(capability);
+  return (
+    <button
+      className="link-button"
+      onClick={() =>
+        void navigator.clipboard.writeText(link).then(
+          () => setNotice(`Meekijklink gekopieerd: ${link}`),
+          () => setNotice(`Op een ander scherm meekijken: ${link}`),
+        )
+      }
+    >
+      🖥 Op ander scherm tonen
+    </button>
+  );
+}
+
 function ChannelAdmin({
   status,
   requestCapability,
@@ -698,7 +634,7 @@ function ChannelAdmin({
             void navigator.clipboard.writeText(channelLink(requestCapability)).then(
               () =>
                 setNotice(
-                  "Link gekopieerd. Iedereen met deze link kan meekijken en een koffie- of waterronde starten.",
+                  "Link gekopieerd. Iedereen met deze link kan meekijken en inloggen om te beoordelen.",
                 ),
               () => setNotice("Kopiëren lukt niet. Sta klembordtoegang toe."),
             )
