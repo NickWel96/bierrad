@@ -432,7 +432,13 @@ test("mentions use frozen server identity, never a display name or browser-suppl
       (e) => e.type === "text" && e.text === "<@U00000003> & <!channel>",
     ),
   );
-  assert.ok(!body.text.includes("<@"));
+  // The fallback carries the same frozen mentions, so Slack notifies them;
+  // the manual name stays escaped and cannot mention or broadcast.
+  assert.deepEqual(
+    [...body.text.matchAll(/<@([^>]*)>/g)].map((m) => m[1]).sort(),
+    ["U00000001", "U00000002"],
+  );
+  assert.ok(body.text.includes("&lt;@U00000003&gt; &amp; &lt;!channel&gt;"));
   assert.ok(!body.text.includes("<!channel>"));
   assert.ok(!JSON.stringify(publicSession(record)).includes("mentionIds"));
   assert.ok(!JSON.stringify(publicSession(record)).includes("U00000001"));
@@ -442,12 +448,14 @@ test("mentions use frozen server identity, never a display name or browser-suppl
       (e) => e.type === "text",
     ),
   );
+  assert.ok(!resultBody(oldJob).text.includes("<@"));
   const invalid = { ...job, mentionIds: job.names.map(() => "!channel") };
   assert.ok(
     resultBody(invalid).blocks[0].elements[0].elements.every(
       (e) => e.type === "text",
     ),
   );
+  assert.ok(!/<[@!]/.test(resultBody(invalid).text));
 });
 
 test("refresh after manual mode retains Slack identities without duplicating participants", () => {

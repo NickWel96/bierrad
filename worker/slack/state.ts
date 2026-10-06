@@ -174,12 +174,20 @@ export function resultBody(job: SlackJob) {
   const invitation = job.review
     ? `\n⭐ Beoordeel de ${job.names.length === 1 ? "haler" : "halers"} tot ${clock.format(job.review.until)}: `
     : "";
-  const text = `${heading}${job.names.join(" · ")}\n${ending}${invitation}${job.review?.link ?? ""}`;
-  const escaped = text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-  // Only server-resolved identities become mention elements. Names remain literal text.
+  const escape = (text: string) =>
+    text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  // Only server-resolved identities become mentions. Names remain literal text.
+  const ids = job.names.map((_, index) => {
+    const id = job.mentionIds?.[index];
+    return id && /^[UW][A-Z0-9]{8,20}$/.test(id) && id !== "USLACKBOT"
+      ? id
+      : null;
+  });
+  // Slack derives notifications from the fallback text, so the same frozen
+  // identities appear there as <@U…>; everything else is escaped.
+  const text = `${escape(heading)}${job.names
+    .map((name, index) => (ids[index] ? `<@${ids[index]}>` : escape(name)))
+    .join(" · ")}${escape(`\n${ending}${invitation}${job.review?.link ?? ""}`)}`;
   const elements: (
     | { type: "text"; text: string }
     | { type: "user"; user_id: string }
@@ -187,11 +195,9 @@ export function resultBody(job: SlackJob) {
   )[] = [{ type: "text", text: heading }];
   job.names.forEach((name, index) => {
     if (index) elements.push({ type: "text", text: " · " });
-    const id = job.mentionIds?.[index];
+    const id = ids[index];
     elements.push(
-      id && /^[UW][A-Z0-9]{8,20}$/.test(id) && id !== "USLACKBOT"
-        ? { type: "user", user_id: id }
-        : { type: "text", text: name },
+      id ? { type: "user", user_id: id } : { type: "text", text: name },
     );
   });
   elements.push({
@@ -207,7 +213,7 @@ export function resultBody(job: SlackJob) {
   return {
     channel: job.source.channelId,
     thread_ts: job.source.parentMessageTs,
-    text: escaped,
+    text,
     blocks: [
       {
         type: "rich_text",
