@@ -1735,3 +1735,15 @@ code.channel-view-link {
     transition: none;
   }
 }
+.slack-reviews {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+.slack-reviews select {
+  padding: 4px 6px;
+  border: 1px solid #d4c7a7;
+  border-radius: 8px;
+  background: #fffdf8;
+  font: inherit;
+}

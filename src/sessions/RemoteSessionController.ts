@@ -428,6 +428,9 @@ export class RemoteSessionController implements SessionController {
   retrySlackResult() {
     return this.command({ type: "slackRetry" });
   }
+  setReviews(enabled: boolean, minutes: number) {
+    return this.command({ type: "setReviews", enabled, minutes });
+  }
   setWinnerCount(count: number) {
     return this.command({ type: "setWinnerCount", count });
   }

@@ -60,6 +60,73 @@ function lastSpinEnd(record: StoredSession): number | undefined {
     ? Math.max(...draw.spins.map((s) => Date.parse(s.startAt) + s.durationMs))
     : undefined;
 }
+/** When voting opens and closes for the current draw; always before the session ends. */
+export function reviewTimes(
+  record: StoredSession,
+  minutes: number,
+): { opensAt: number; closesAt: number } | undefined {
+  const end = lastSpinEnd(record);
+  if (end === undefined) return;
+  const opensAt = end + REVIEW_DELAY_MS;
+  return {
+    opensAt,
+    closesAt: Math.min(opensAt + minutes * 60000, record.expiresAt - 60000),
+  };
+}
+/**
+ * Reviews of a host-started Slack session (Bierrad). The key and the join
+ * link live until the session ends; personal links keep only a pseudonym.
+ */
+export interface SessionReviews {
+  enabled: boolean;
+  minutes: number;
+  /** Random HMAC key for this session's pseudonyms. */
+  key?: string;
+  /** Hash of the join link, which is posted in the Slack thread. */
+  joinHash?: string;
+  /** The full join URL, built from FRONTEND_URL; only ever sent to Slack. */
+  link?: string;
+  members?: { hash: string; pseudonym: string }[];
+  loginWindow?: number;
+  logins?: number;
+}
+/**
+ * Called when a host-started session draws. A new draw cancels a review that
+ * is still open: those votes are dropped and nothing is posted.
+ */
+export function prepareSessionReview(record: StoredSession): void {
+  const settings = record.reviews,
+    slack = record.slack,
+    draw = record.session.activeDraw;
+  // Channel rounds set up their own review when they are created.
+  if (slack?.channelRound) return;
+  if (record.review?.status !== "closed") delete record.review;
+  if (
+    !settings?.enabled ||
+    !settings.key ||
+    !settings.link ||
+    !slack?.source ||
+    slack.channelRound ||
+    !draw
+  )
+    return;
+  record.review = {
+    minutes: settings.minutes,
+    key: settings.key,
+    link: settings.link,
+    status: "waiting",
+  };
+  // Invite in the winner post only when someone can review someone else.
+  const slackIds = new Set(Object.values(slack.mapping));
+  const winners = draw.spins.map((s) => s.winnerId);
+  const voters = draw.participantIds.filter((id) => slackIds.has(id));
+  const invite =
+    winners.some((w) => slackIds.has(w)) &&
+    voters.some((v) => winners.some((w) => w !== v && slackIds.has(w)));
+  const times = reviewTimes(record, settings.minutes);
+  if (invite && times && slack.job)
+    slack.job.review = { until: times.closesAt, link: settings.link };
+}
 /**
  * Freezes who may vote on which winner when the draw starts. `pseudonyms`
  * maps every Slack participant of the draw to its pseudonym.
@@ -72,7 +139,8 @@ export function openReview(
     draw = record.session.activeDraw,
     slack = record.slack;
   const end = lastSpinEnd(record);
-  if (review?.status !== "waiting" || !draw || !slack || end === undefined)
+  const times = review && reviewTimes(record, review.minutes);
+  if (review?.status !== "waiting" || !draw || !slack || end === undefined || !times)
     return;
   const slackIds = new Map(
     Object.entries(slack.mapping).map(([slackId, id]) => [id, slackId]),
@@ -82,7 +150,7 @@ export function openReview(
     return slackId ? (pseudonyms.get(slackId) ?? null) : null;
   };
   review.drawId = draw.id;
-  review.opensAt = end + REVIEW_DELAY_MS;
+  review.opensAt = times.opensAt;
   review.winners = draw.spins.map((spin) => {
     const slackId = slackIds.get(spin.winnerId) ?? null;
     return {
@@ -105,11 +173,7 @@ export function openReview(
   ];
   review.voted = [];
   review.totals = review.winners.map(() => ({ sum: 0, count: 0, texts: [] }));
-  // Always closes before the session ends, whatever was configured.
-  review.closesAt = Math.min(
-    review.opensAt + review.minutes * 60000,
-    record.expiresAt - 60000,
-  );
+  review.closesAt = times.closesAt;
   review.status = "open";
   if (!review.eligible.length) closeReview(record, end);
   else if (record.slack?.card?.kind === "winner") {

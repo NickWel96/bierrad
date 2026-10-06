@@ -2,11 +2,13 @@ import { useTheme } from "../Theme";
 import { useEffect, useRef, useState } from "react";
 import { startSlackAutoRefresh } from "../utils/slackAutoRefresh";
 import type { SlackHostStatus } from "../../shared/protocol";
+import { SESSION_REVIEW_MINUTE_CHOICES } from "../../shared/reviews";
 export function SlackControls({
   status,
   locked,
   onImport,
   onManual,
+  onReviews,
   scheduledStartAt,
 }: {
   status: SlackHostStatus;
@@ -14,6 +16,7 @@ export function SlackControls({
   locked: boolean;
   onImport: (link?: string) => Promise<void>;
   onManual: () => Promise<void>;
+  onReviews?: (enabled: boolean, minutes: number) => Promise<void>;
 }) {
   const theme = useTheme();
   const [tab, setTab] = useState(status.source),
@@ -162,6 +165,51 @@ export function SlackControls({
                 Verversen volgt de actuele reacties. Handmatig toegevoegde namen
                 blijven. De officiële uitslag gaat automatisch naar deze thread.
               </p>
+              {status.reviews && onReviews && (
+                <div className="slack-reviews">
+                  <label className="auto-refresh-toggle">
+                    <input
+                      type="checkbox"
+                      checked={status.reviews.enabled}
+                      disabled={busy || !status.enabled}
+                      onChange={(event) =>
+                        void run(() =>
+                          onReviews(event.target.checked, status.reviews!.minutes),
+                        )
+                      }
+                    />
+                    ⭐ Reviews na de trekking
+                  </label>
+                  {status.reviews.enabled && (
+                    <label>
+                      Stemmen kan{" "}
+                      <select
+                        value={status.reviews.minutes}
+                        disabled={busy || !status.enabled}
+                        onChange={(event) =>
+                          void run(() =>
+                            onReviews(true, Number(event.target.value)),
+                          )
+                        }
+                      >
+                        {SESSION_REVIEW_MINUTE_CHOICES.map((m) => (
+                          <option key={m} value={m}>
+                            {m < 60 ? `${m} minuten` : `${m / 60} uur`}
+                          </option>
+                        ))}
+                      </select>{" "}
+                      vanaf een minuut na de trekking
+                    </label>
+                  )}
+                  <p className="storage-note">
+                    De deelnamelink komt in deze thread, bij de uitslag en in de
+                    herinnering: iedereen die de thread leest kan meekijken.
+                    Deelnemers loggen in met Slack en geven de halers anoniem
+                    sterren, nooit zichzelf. Een nieuwe trekking stopt een
+                    lopende stemronde.
+                  </p>
+                </div>
+              )}
             </>
           )}
         </div>

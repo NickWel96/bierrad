@@ -12,7 +12,17 @@ import {
   advanceDraw,
 } from "../src/domain/drawEngine";
 import { getCapabilities } from "../src/domain/capabilities";
-import { reviewDeadline, reviewProgress, type RoundReview } from "./reviews";
+import {
+  prepareSessionReview,
+  reviewDeadline,
+  reviewProgress,
+  type RoundReview,
+  type SessionReviews,
+} from "./reviews";
+import {
+  DEFAULT_SESSION_REVIEW_SETTINGS,
+  validSessionReviewMinutes,
+} from "../shared/reviews";
 import { validateParticipants } from "../src/utils/participants";
 import type { BeerWheelSession, ClientRole } from "../src/domain/models";
 import type { ScheduledDraw, PublicBeerWheelSession } from "../shared/protocol";
@@ -50,8 +60,12 @@ export interface StoredSession {
   slack?: SlackState;
   scheduledDraw?: ScheduledDraw;
   scheduleCheckUntil?: number;
-  /** Channel rounds with reviews only. */
+  /** The review of the latest draw, while it runs. */
   review?: RoundReview;
+  /** Host-started Slack sessions: review settings, key and personal links. */
+  reviews?: SessionReviews;
+  /** This session's object name; it grants nothing by itself. */
+  locator?: string;
 }
 export function newSession(
   hostHash: string,
@@ -249,6 +263,7 @@ export function mutate(
     endSession: [],
     slackManual: [],
     slackRetry: [],
+    setReviews: ["enabled", "minutes"],
   };
   if (
     typeof command.type !== "string" ||
@@ -277,8 +292,10 @@ export function mutate(
     throw new RequestError(409, "slack_busy");
   if (
     ["reset", "startDraw"].includes(String(command.type)) &&
-    record.slack?.job &&
-    ["pending", "posting"].includes(record.slack.job.status)
+    ((record.slack?.job &&
+      ["pending", "posting"].includes(record.slack.job.status)) ||
+      (record.review?.job &&
+        ["pending", "posting"].includes(record.review.job.status)))
   )
     throw new RequestError(409, "slack_posting");
   if (
@@ -398,6 +415,7 @@ export function mutate(
       };
       if (record.slack) delete record.slack.job;
       queueResult(record);
+      prepareSessionReview(record);
       delete record.scheduledDraw;
       clearReminder(record);
       record.draws++;
@@ -428,6 +446,22 @@ export function mutate(
         throw new RequestError(409, "not_ready");
       job.status = "pending";
       job.readyAt = now;
+      break;
+    }
+    case "setReviews": {
+      // Only sessions started with Sign in with Slack can hold reviews.
+      if (!record.slack || record.slack.channelRound)
+        throw new RequestError(403, "forbidden");
+      if (
+        typeof command.enabled !== "boolean" ||
+        !validSessionReviewMinutes(command.minutes)
+      )
+        throw new RequestError(400, "invalid");
+      record.reviews = {
+        ...(record.reviews ?? DEFAULT_SESSION_REVIEW_SETTINGS),
+        enabled: command.enabled,
+        minutes: command.minutes,
+      };
       break;
     }
     case "endSession":

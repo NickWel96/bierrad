@@ -22,6 +22,8 @@ import {
   parseLiveRoute,
 } from "./sessions/liveNavigation";
 import { parseChannelRoute } from "./sessions/ChannelClient";
+import { parseJoinRoute } from "./sessions/JoinClient";
+import { JoinFailurePage, SessionJoinPage } from "./components/SessionJoinPage";
 import { isChannelVariant } from "../shared/channel";
 import {
   ChannelBindPage,
@@ -37,6 +39,13 @@ export function SessionRoot() {
     window.addEventListener("hashchange", change);
     return () => window.removeEventListener("hashchange", change);
   }, []);
+  const join = parseJoinRoute(hash);
+  if (join)
+    return join.page === "failure" ? (
+      <JoinFailurePage key={hash} failure={join.failure} />
+    ) : (
+      <SessionJoinPage key={hash} capability={join.capability} />
+    );
   const channel = parseChannelRoute(hash);
   if (channel)
     return (

@@ -170,6 +170,8 @@ Vlak vóór de automatische trekking controleert de server de Slack-reacties nog
 
 ## Slack-deelnemers en threaduitslag
 
+**Reviews (bier).** In een Slack-sessie staat **⭐ Reviews na de trekking** standaard aan (stemtijd 30 minuten, aan te passen bij de Slack-instellingen van de host). De uitslag in de thread krijgt dan een **Open de ronde**-link. Daar log je in met Slack of kijk je alleen mee. Een minuut na de trekking geven deelnemers de andere halers anoniem 1–5 sterren. De reviews komen als los bericht in de thread. Een nieuwe trekking stopt een lopende stemronde. Iedereen die de thread leest, kan met die link meekijken tot de sessie afloopt.
+
 Een volwaardig lid van de Slack-workspace start een Slack-sessie met **Start met Slack** (Sign in with Slack). Een gewone publieke host, gast of externe gebruiker heeft geen Slack-starttoegang. Kies Slack, plak een berichtlink en haal de `:beers:`-reactors op. Refresh volgt de reacties en behoudt handmatige toevoegingen; gelijke namen krijgen onderscheidende labels met stabiele tijdelijke IDs. Na de trekking post de server de officiële winnaars automatisch in de oorspronkelijke thread, ook als de host gesloten is. Geïmporteerde Slack-winnaars krijgen een echte @vermelding; handmatige deelnemers blijven gewone tekst. Fouten veranderen de uitslag niet; alleen zeker afgewezen posts kunnen gecontroleerd opnieuw worden aangeboden. Bij onzekere aflevering voorkomt Bierrad herverzending.
 
 [Appmanifest en veilige instelling](docs/slack-setup.md) · [Security review en tien antwoorden](docs/slack-security-review.md)

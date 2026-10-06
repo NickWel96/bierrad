@@ -245,6 +245,12 @@ test(
       // Without a Slack thread the opt-in is refused.
       assert.equal((await plan(viewer)).status, 409);
       await stub.linkSlack();
+      // With reviews (the default) the reminder carries the join link instead;
+      // this suite covers the spectator link, so reviews are off here.
+      assert.equal(
+        (await command({ type: "setReviews", enabled: false, minutes: 30 })).status,
+        200,
+      );
       // Host link, foreign, malformed or another session's link: never posted.
       const [locator] = host.split(".");
       for (const [cap, status] of [

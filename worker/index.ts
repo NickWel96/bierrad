@@ -65,6 +65,7 @@ async function createSession(
     spectatorHash,
     grant,
     variant,
+    locator,
   );
   return {
     hostCapability: `${locator}.${host}`,
@@ -113,10 +114,18 @@ async function slackAuth(
     memberStart ||
     (!start && url.pathname === "/auth/slack/callback" && !!pending?.memberLocator);
   if (memberStart) variant = "coffee";
+  // A personal session link: started by a form POST from a session's join page.
+  const joinStart = url.pathname === "/auth/slack/join";
+  const joining =
+    joinStart ||
+    (!start && url.pathname === "/auth/slack/callback" && !!pending?.joinLocator);
+  const formStart = memberStart || joinStart;
   const clear = loginCookie("", 0);
   const fail = (reason: string) =>
     redirect(
-      member
+      joining
+        ? `${app.href}#/meedoen-login/${reason}`
+        : member
         ? `${app.href}#/koffie-login/${reason}`
         : binding
           ? `${app.href}#/koffie-koppelen/${reason}`
@@ -124,14 +133,14 @@ async function slackAuth(
       clear,
     );
   try {
-    if (request.method !== (memberStart ? "POST" : "GET"))
+    if (request.method !== (formStart ? "POST" : "GET"))
       return json({ code: "invalid" }, 405);
     const ip = request.headers.get("CF-Connecting-IP") ?? "local";
     if (!(await env.REQUEST_LIMIT.limit({ key: ip })).success)
       return fail("busy");
-    if (memberStart) {
-      // The channel link travels only in a small form body from an allowed
-      // origin, never in a URL; it proves the person already holds it.
+    if (formStart) {
+      // The channel or join link travels only in a small form body from an
+      // allowed origin, never in a URL; it proves the person already holds it.
       if (
         url.search ||
         !env.ALLOWED_ORIGINS.split(",").includes(
@@ -150,6 +159,22 @@ async function slackAuth(
         !capability?.locator
       )
         return fail("expired");
+      if (joinStart) {
+        const sessionVariant = await env.SESSIONS.getByName(
+          capability.locator,
+        ).joinLoginAllowed(capability.secret);
+        if (!sessionVariant) return fail("expired");
+        const login = beginLogin(
+          slackEnvironment(env, sessionVariant),
+          sessionVariant,
+          callback,
+          Date.now(),
+          undefined,
+          undefined,
+          capability.locator,
+        );
+        return redirect(login.location, login.cookie);
+      }
       if (
         !(await env.CHANNELS.getByName(capability.locator).memberLoginAllowed(
           capability.secret,
@@ -182,7 +207,11 @@ async function slackAuth(
     variant = pending.variant;
     // Before any Slack call: failed attempts also spend the creation budget.
     // Personal logins create nothing; their channel bounds them per minute.
-    if (!pending.memberLocator && !(await creationAllowed(env, ip)))
+    if (
+      !pending.memberLocator &&
+      !pending.joinLocator &&
+      !(await creationAllowed(env, ip))
+    )
       return fail("busy");
     const workspace = await completeLogin(
       slackEnvironment(env, variant),
@@ -190,6 +219,17 @@ async function slackAuth(
       url.searchParams,
       callback,
     );
+    if (pending.joinLocator) {
+      let personal: string;
+      try {
+        personal = await env.SESSIONS.getByName(pending.joinLocator).addMember(
+          workspace.userId,
+        );
+      } catch {
+        return fail("expired");
+      }
+      return redirect(`${app.href}#/meedoen/${personal}`, clear);
+    }
     if (pending.memberLocator) {
       let personal: string;
       try {
@@ -362,6 +402,19 @@ export default {
               ? body.variant
               : "beer";
           response = json(await createSession(env, variant), 201);
+        } else if (url.pathname === "/api/join") {
+          // A session's join link or a personal link: status, review, logout.
+          if (!["GET", "POST"].includes(request.method))
+            throw new RequestError(405, "invalid");
+          const capability = parseCapability(
+            request.headers.get("Authorization")?.replace(/^Bearer /, "") ??
+              null,
+          );
+          if (!capability?.locator) throw new RequestError(404, "unavailable");
+          response = await env.SESSIONS.getByName(capability.locator).joinAccess(
+            capability.secret,
+            request.method === "POST" ? await readBody(request) : null,
+          );
         } else if (url.pathname === "/api/channel") {
           if (!["GET", "POST"].includes(request.method))
             throw new RequestError(405, "invalid");
@@ -435,7 +488,11 @@ export default {
               !(await sameSession(command.spectatorCapability, capability))
             )
               throw new RequestError(400, "invalid");
-            response = await stub.access(capability.secret, command);
+            response = await stub.access(
+              capability.secret,
+              command,
+              await capabilityLocator(capability),
+            );
           }
         } else throw new RequestError(404, "unavailable");
       }

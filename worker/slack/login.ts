@@ -21,6 +21,8 @@ interface Pending {
   channelId?: string;
   /** Set when the login gives a personal link for this channel's object. */
   memberLocator?: string;
+  /** Set when the login gives a personal link for this live session's object. */
+  joinLocator?: string;
   state: string;
   nonce: string;
   expiresAt: number;
@@ -39,7 +41,7 @@ export function parseLoginCookie(
   // Duplicates are ambiguous; fail closed.
   if (values.length !== 1) return;
   const match =
-    /^([a-z]+|channel-[CG][A-Z0-9]{8,20}|member-[a-f0-9]{32})\.([a-f0-9]{64})\.([a-f0-9]{64})\.(\d{13})$/.exec(
+    /^([a-z]+|channel-[CG][A-Z0-9]{8,20}|member-[a-f0-9]{32}|join-(?:beer|coffee|water)-[a-f0-9]{32})\.([a-f0-9]{64})\.([a-f0-9]{64})\.(\d{13})$/.exec(
       values[0].slice(LOGIN_COOKIE.length + 1),
     );
   if (!match || Number(match[4]) <= now) return;
@@ -49,10 +51,18 @@ export function parseLoginCookie(
   const member = match[1].startsWith("member-")
     ? match[1].slice(7)
     : undefined;
-  if (!channel && !member && !isWheelVariant(match[1])) return;
+  const join = /^join-([a-z]+)-([a-f0-9]{32})$/.exec(match[1]);
+  if (!channel && !member && !join && !isWheelVariant(match[1])) return;
+  if (join && !isWheelVariant(join[1])) return;
   return {
-    // Channel bindings and personal links are Koffierad features: the coffee app.
-    variant: channel || member ? "coffee" : (match[1] as WheelVariant),
+    // Channel bindings and personal links are Koffierad features: the coffee
+    // app. A session's personal link uses that session's own app.
+    variant: join
+      ? (join[1] as WheelVariant)
+      : channel || member
+        ? "coffee"
+        : (match[1] as WheelVariant),
+    ...(join ? { joinLocator: join[2] } : {}),
     ...(channel ? { channelId: channel } : {}),
     ...(member ? { memberLocator: member } : {}),
     state: match[2],
@@ -84,6 +94,7 @@ export function beginLogin(
   now = Date.now(),
   channelId?: string,
   memberLocator?: string,
+  joinLocator?: string,
 ): { location: string; cookie: string } {
   if (!loginConfigured(env)) throw new LoginError("unavailable");
   if (
@@ -94,6 +105,11 @@ export function beginLogin(
   if (
     memberLocator !== undefined &&
     (variant !== "coffee" || channelId || !/^[a-f0-9]{32}$/.test(memberLocator))
+  )
+    throw new LoginError("expired");
+  if (
+    joinLocator !== undefined &&
+    (channelId || memberLocator || !/^[a-f0-9]{32}$/.test(joinLocator))
   )
     throw new LoginError("expired");
   const state = randomHex(),
@@ -111,7 +127,7 @@ export function beginLogin(
   return {
     location: location.href,
     cookie: loginCookie(
-      `${channelId ? `channel-${channelId}` : memberLocator ? `member-${memberLocator}` : variant}.${state}.${nonce}.${now + LOGIN_TTL_MS}`,
+      `${channelId ? `channel-${channelId}` : memberLocator ? `member-${memberLocator}` : joinLocator ? `join-${variant}-${joinLocator}` : variant}.${state}.${nonce}.${now + LOGIN_TTL_MS}`,
       LOGIN_TTL_MS / 1000,
     ),
   };
