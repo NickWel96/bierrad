@@ -8,6 +8,7 @@
  *   npm run demo   →   open http://127.0.0.1:8787/__demo/
  */
 import { spawn } from "node:child_process";
+import { createHmac } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import { wordLocator } from "../worker/auth";
@@ -21,6 +22,7 @@ const CHANNEL = "C0DEMO0001";
 const BOT = "UBOT00001";
 const ADMIN = "U0DEMO099";
 const COUNTDOWN_MS = 10000;
+const SIGNING_SECRET = "synthetic-signing-secret";
 const PEOPLE: Record<string, string> = {
   U0DEMO001: "Anouk",
   U0DEMO002: "Bram",
@@ -273,6 +275,7 @@ const mf = new Miniflare(
           COFFEE_SLACK_BOT_TOKEN: "synthetic-coffee-credential",
           COFFEE_SLACK_CLIENT_ID: CLIENT_ID,
           COFFEE_SLACK_CLIENT_SECRET: "synthetic-coffee-client-secret",
+          COFFEE_SLACK_SIGNING_SECRET: SIGNING_SECRET,
         },
         ratelimits: {
           CREATION_LIMIT: { namespace_id: "90", simple: { limit: 1000, period: 60 } },
@@ -341,10 +344,41 @@ async function startSoon() {
   await current.session.demoStartAt(startAt);
   log("het rad draait over 10 seconden");
 }
+/** Rounds start only from Slack: a signed fake `/koffierad 15`, as Slack would send it. */
 async function requestRound() {
   autoCountdown = true;
-  await channel(requester, { type: "requestRound", minutes: 15, variant: "coffee", reviews: true });
-  log("koffieronde aangevraagd; de oproep staat in het nep-Slack-kanaal");
+  const body = new URLSearchParams({
+    command: "/koffierad",
+    text: "15",
+    user_id: ADMIN,
+    team_id: TEAM,
+    channel_id: CHANNEL,
+    channel_name: "koffie-demo",
+  }).toString();
+  const at = String(Math.floor(Date.now() / 1000));
+  const signature = createHmac("sha256", SIGNING_SECRET).update(`v0:${at}:${body}`).digest("hex");
+  const response = await go("/slack/commands", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "X-Slack-Request-Timestamp": at,
+      "X-Slack-Signature": `v0=${signature}`,
+    },
+    body,
+  });
+  // Success is an empty 200; a refusal is an ephemeral reply only "you" would see.
+  const reply = await response.text();
+  if (!response.ok || reply) {
+    const text = (() => {
+      try {
+        return (JSON.parse(reply) as { text?: string }).text;
+      } catch {
+        return undefined;
+      }
+    })();
+    throw new Error(text ?? (reply || String(response.status)));
+  }
+  log("/koffierad 15 getypt; de oproep staat in het nep-Slack-kanaal");
 }
 /** Everyone but you (and the haler, whom the server refuses) votes. */
 async function othersVote() {

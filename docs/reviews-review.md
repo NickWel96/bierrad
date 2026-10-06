@@ -8,9 +8,8 @@ Implementatiereview tegen [SECURITY.md](../SECURITY.md#round-reviews--reviewed-e
 | --- | --- | --- |
 | `POST /auth/slack/member` | Een geldige kanaallink (beheer-, aanvraag- of persoonlijke link) in een formulierbody | De Origin moet op de allowlist staan; daarom gebruikt de frontend het referrerbeleid `strict-origin` en heeft het formulier geen `rel="noreferrer"` (anders sturen browsers `Origin: null`). De body is `application/x-www-form-urlencoded`, hooguit 1 KiB, met precies één veld `capability` en zonder query. Er gaan hooguit 30 logins per kanaal per minuut. Daarna volgt Sign in with Slack met het doel `member-<locator>` in de logincookie. |
 | `GET /auth/slack/callback` (doel member) | De bestaande OIDC-controles; alleen volwaardige leden van de workspace van de bot | Het gebruikerstoken wordt ingetrokken. De user-ID wordt alleen omgezet in een pseudoniem. De persoonlijke link komt alleen in het fragment terecht. Fouten komen uit op `#/koffie-login/<reden>`. |
-| `/api/channel`, rol `member` | De SHA-256-hash van een geheim van 256 bits, timing-safe vergeleken, met een vervaldatum | Heeft de rechten van de aanvraaglink, plus `review` en `logout`. Een member mag nooit beheren (403). |
+| `/api/channel`, rol `member` | De SHA-256-hash van een geheim van 256 bits, timing-safe vergeleken, met een vervaldatum | Heeft de rechten van de aanvraaglink, plus `review` en `logout`. Een member mag nooit beheren (403) en, net als elke kanaallink, nooit een ronde starten (400). |
 | `/api/channel` `setReviews` | Alleen de beheerder | Strikte vorm: `enabled` boolean, `minutes` ∈ {5, 10, 15, 30}. |
-| `requestRound.reviews` | Aanvraag- of persoonlijke link | Optionele boolean, anders 400. |
 
 ## Gegevens
 
@@ -20,7 +19,7 @@ Implementatiereview tegen [SECURITY.md](../SECURITY.md#round-reviews--reviewed-e
 
 ## Standaard
 
-Reviews staan standaard aan, met 15 minuten stemtijd, ook voor bestaande koppelingen zonder opgeslagen keuze (gevraagd door de eigenaar op 2026-10-06). Daardoor linkt een oproep standaard naar de kanaalpagina in plaats van naar de woordlink. Dat is dezelfde link die al in het koppelbericht staat, dus het publiek wordt niet groter. De beheerder kan reviews uitzetten, en per aanvraag kan het ook.
+Reviews staan standaard aan, met 15 minuten stemtijd, ook voor bestaande koppelingen zonder opgeslagen keuze (gevraagd door de eigenaar op 2026-10-06). Daardoor linkt een oproep standaard naar de kanaalpagina in plaats van naar de woordlink. Dat is dezelfde link die al in het koppelbericht staat, dus het publiek wordt niet groter. De beheerder kan reviews uitzetten. Sinds 2026-10-06 starten rondes alleen met `/koffierad` of `/waterrad` en volgen ze altijd die kanaalinstelling; per aanvraag aan- of uitzetten bestaat niet meer.
 
 Stemmen opent een minuut na de finale (gevraagd door de eigenaar), en de stemtijd telt vanaf dat moment. Een persoonlijke pagina vraagt het stemformulier op dat moment op en vijf seconden later nog eens; daarnaast pollt hij elke 10 seconden.
 

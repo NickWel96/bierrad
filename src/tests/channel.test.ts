@@ -60,14 +60,14 @@ test("channel client sends the capability only as a bearer header, never stores 
       status: { role: "requester", defaultMinutes: 5, roundsLeft: 25, expiresAt: "2027-01-01T00:00:00.000Z" },
     });
   }) as typeof fetch;
-  const result = await channelRequest("https://api.example.test", cap, { type: "requestRound", minutes: 5 }, fetcher);
+  const result = await channelRequest("https://api.example.test", cap, { type: "setDefaultMinutes", minutes: 5 }, fetcher);
   assert.equal(result.type, "status");
   assert.equal(seen[0].url, "https://api.example.test/api/channel");
   assert.ok(!seen[0].url.includes(cap));
   assert.equal(new Headers(seen[0].init.headers).get("authorization"), `Bearer ${cap}`);
   assert.equal(seen[0].init.credentials, "omit");
   assert.equal(seen[0].init.referrerPolicy, "no-referrer");
-  assert.equal(seen[0].init.body, JSON.stringify({ type: "requestRound", minutes: 5 }));
+  assert.equal(seen[0].init.body, JSON.stringify({ type: "setDefaultMinutes", minutes: 5 }));
 });
 
 test("channel errors become friendly Dutch messages without server details", async () => {

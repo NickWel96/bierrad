@@ -25,7 +25,6 @@ export const channelCopy: Record<
     tap: "tappen",
   },
 };
-export const ROUND_MINUTE_CHOICES = [1, 2, 3, 5, 10, 15] as const;
 export const DEFAULT_ROUND_MINUTES = 5;
 export const MAX_ROUND_MINUTES = 30;
 /** Rounds per channel per rolling 24 hours. */
@@ -66,15 +65,8 @@ export interface ChannelStatus {
     ballot?: ReviewBallot;
   };
 }
+/** Rounds start only from a signed `/koffierad` or `/waterrad`, never with a link. */
 export type ChannelCommand =
-  /** Without a variant the round is coffee, as before water existed. */
-  | {
-      type: "requestRound";
-      minutes: number;
-      variant?: ChannelVariant;
-      /** Overrides the channel's default for this round. */
-      reviews?: boolean;
-    }
   | { type: "setDefaultMinutes"; minutes: number }
   | { type: "setReviews"; enabled: boolean; minutes: number }
   | { type: "review"; drawId: string; scores: number[]; texts: string[] }

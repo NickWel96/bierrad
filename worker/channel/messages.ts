@@ -285,7 +285,7 @@ export function boundBody(channelId: string, requestLink: string) {
     },
     {
       type: "text",
-      text: ": daar zie je steeds de huidige ronde en vraag je een nieuwe aan. Of typ /koffierad of /waterrad (met bijvoorbeeld 10 erachter voor tien minuten). Meedoen doe je door op ☕ of 💧 te klikken onder de oproep. Eerdere links van dit kanaal werken niet meer.",
+      text: ": daar zie je steeds de huidige ronde. Een nieuwe ronde start je door hier /koffierad of /waterrad te typen (met bijvoorbeeld 10 erachter voor tien minuten). Meedoen doe je door op ☕ of 💧 te klikken onder de oproep. Eerdere links van dit kanaal werken niet meer.",
     },
   ]);
 }
