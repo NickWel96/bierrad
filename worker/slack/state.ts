@@ -31,6 +31,8 @@ export interface SlackJob {
   names: string[];
   /** Private, frozen in winner order; absent on jobs created before mentions shipped. */
   mentionIds?: (string | null)[];
+  /** Host-started sessions with reviews: the invitation under the winners. */
+  review?: { until: number; link: string };
   status: "pending" | "posting" | "posted" | "failed" | "uncertain";
   readyAt: number;
   attemptedAt?: number;
@@ -169,7 +171,10 @@ export function resultBody(job: SlackJob) {
   const theme = themes[reactionVariant(job.source.reactionName)];
   const heading = `${theme.icon} Het rad heeft gesproken!\n`;
   const ending = `${job.names.length === 1 ? "Jij mag" : "Jullie mogen"} ${theme.drink} halen!`;
-  const text = `${heading}${job.names.join(" · ")}\n${ending}`;
+  const invitation = job.review
+    ? `\n⭐ Beoordeel de ${job.names.length === 1 ? "haler" : "halers"} tot ${clock.format(job.review.until)}: `
+    : "";
+  const text = `${heading}${job.names.join(" · ")}\n${ending}${invitation}${job.review?.link ?? ""}`;
   const escaped = text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -178,6 +183,7 @@ export function resultBody(job: SlackJob) {
   const elements: (
     | { type: "text"; text: string }
     | { type: "user"; user_id: string }
+    | { type: "link"; url: string; text: string }
   )[] = [{ type: "text", text: heading }];
   job.names.forEach((name, index) => {
     if (index) elements.push({ type: "text", text: " · " });
@@ -192,6 +198,12 @@ export function resultBody(job: SlackJob) {
     type: "text",
     text: `\n${ending}`,
   });
+  // The join link is server-built from FRONTEND_URL, never client text.
+  if (job.review)
+    elements.push(
+      { type: "text", text: invitation },
+      { type: "link", url: job.review.link, text: "Open de ronde" },
+    );
   return {
     channel: job.source.channelId,
     thread_ts: job.source.parentMessageTs,
@@ -275,12 +287,14 @@ export function reminderBody(
   link: string,
   startAt: string,
   now: number,
+  /** With reviews: the session's join link, to watch or log in. */
+  join = false,
 ) {
   const theme = themes[variant];
   const minutes = Math.max(1, Math.round((Date.parse(startAt) - now) / 60000));
   const heading = `⏰ Over ${minutes} ${minutes === 1 ? "minuut" : "minuten"} (${clock.format(Date.parse(startAt))}) draait het ${theme.name}! ${theme.icon}
-Kijk live mee: `;
-  const label = "Open het rad";
+${join ? "Kijk live mee, of log in om na afloop de halers te beoordelen: " : "Kijk live mee: "}`;
+  const label = join ? "Open de ronde" : "Open het rad";
   const escape = (text: string) =>
     text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   return {

@@ -5,7 +5,7 @@ import {
   type ReviewBallot,
   type ReviewSubmission,
 } from "../../shared/reviews";
-import type { ChannelVariant } from "../../shared/channel";
+import type { WheelVariant } from "../../shared/variant";
 
 const clock = new Intl.DateTimeFormat("nl-NL", {
   timeZone: "Europe/Amsterdam",
@@ -22,7 +22,7 @@ export function ReviewBallotCard({
   onLater,
 }: {
   ballot: ReviewBallot;
-  variant: ChannelVariant;
+  variant: WheelVariant;
   channelName?: string;
   onSubmit: (submission: ReviewSubmission) => Promise<void>;
   onLater: () => void;
@@ -141,8 +141,13 @@ export function ReviewJoin({
   apiUrl,
   capability,
   viewLink,
+  path = "/auth/slack/member",
+  explanation = "Log in om na afloop de haler te beoordelen.",
 }: {
   apiUrl: string;
+  /** `/auth/slack/member` for a channel, `/auth/slack/join` for a session. */
+  path?: string;
+  explanation?: string;
   capability: string;
   viewLink?: string;
 }) {
@@ -150,7 +155,7 @@ export function ReviewJoin({
     <form
       className="review-join"
       method="post"
-      action={`${apiUrl}/auth/slack/member`}
+      action={`${apiUrl}${path}`}
       rel="noreferrer"
     >
       <input type="hidden" name="capability" value={capability} />
@@ -158,7 +163,7 @@ export function ReviewJoin({
         Inloggen met Slack
       </button>
       {viewLink && <a href={viewLink}>Alleen kijken</a>}
-      <small>Log in om na afloop de haler te beoordelen.</small>
+      <small>{explanation}</small>
     </form>
   );
 }

@@ -44,4 +44,6 @@ export interface SessionController {
   importSlack?(permalink?: string): Promise<void>;
   useManualSource?(): Promise<void>;
   retrySlackResult?(): Promise<void>;
+  /** Login-started Slack sessions: reviews of the winners after each draw. */
+  setReviews?(enabled: boolean, minutes: number): Promise<void>;
 }

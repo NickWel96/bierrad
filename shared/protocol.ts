@@ -26,6 +26,8 @@ export interface SlackHostStatus {
     startAt: string;
     status: SlackReminderStatus;
   };
+  /** Reviews of the winners after each draw (login-started sessions only). */
+  reviews?: { enabled: boolean; minutes: number };
 }
 export type SlackReminderStatus =
   | "pending"
@@ -63,7 +65,8 @@ export type HostCommand =
   | { type: "endSession" }
   | { type: "slackImport"; permalink?: string }
   | { type: "slackManual" }
-  | { type: "slackRetry" };
+  | { type: "slackRetry" }
+  | { type: "setReviews"; enabled: boolean; minutes: number };
 export type ClientToServerMessage = { type: "ping" };
 export type ServerToClientMessage =
   | {

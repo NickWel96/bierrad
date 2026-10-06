@@ -226,6 +226,12 @@ export default function App({ controller }: { controller: SessionController }) {
                     }
                     onImport={(link) => controller.importSlack!(link)}
                     onManual={() => controller.useManualSource!()}
+                    onReviews={
+                      controller.setReviews
+                        ? (enabled, minutes) =>
+                            controller.setReviews!(enabled, minutes)
+                        : undefined
+                    }
                   />
                 ) : undefined
               }

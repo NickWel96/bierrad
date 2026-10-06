@@ -81,3 +81,16 @@ test("channel errors become friendly Dutch messages without server details", asy
     (e: unknown) => e instanceof ChannelApiError && !e.message.includes("secret"),
   );
 });
+
+test("session join routes accept only exact hex links and known login failures", async () => {
+  const { parseJoinRoute } = await import("../sessions/JoinClient");
+  assert.deepEqual(parseJoinRoute(`#/meedoen/${cap}`), { page: "join", capability: cap });
+  assert.deepEqual(parseJoinRoute("#/meedoen-login/busy"), { page: "failure", failure: "busy" });
+  for (const hash of [
+    "#/meedoen/aap-beer-dak-fiets-hoed",
+    `#/meedoen/${cap}/x`,
+    "#/meedoen-login/not_in_channel",
+    "#/meedoen",
+  ])
+    assert.equal(parseJoinRoute(hash), null, hash);
+});
