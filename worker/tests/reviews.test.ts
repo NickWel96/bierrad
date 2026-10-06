@@ -191,9 +191,27 @@ test("the review post quotes anonymous texts literally, in the thread only", () 
   const blocks = body.blocks[0].elements as { type: string; elements: Record<string, unknown>[] }[];
   assert.deepEqual(blocks[0].elements[1], { type: "user", user_id: "U00000001" });
   assert.deepEqual(blocks[1], {
-    type: "rich_text_quote",
-    elements: [{ type: "text", text: "<!here> *vet* <https://evil.example|klik>" }],
+    type: "rich_text_list",
+    style: "bullet",
+    elements: [
+      {
+        type: "rich_text_section",
+        elements: [{ type: "text", text: "<!here> *vet* <https://evil.example|klik>" }],
+      },
+    ],
   });
+  // Every review is its own bullet, also in the fallback.
+  const two = reviewBody("C00000001", "1", [
+    { name: "Nick", mentionId: null, average: 3, count: 2, texts: ["Lekker", "Troebel"] },
+  ]);
+  const list = (two.blocks[0].elements as { elements?: unknown[] }[])[1];
+  assert.equal(list.elements!.length, 2);
+  assert.ok(two.text.endsWith("• Lekker\n• Troebel"));
+  // Without texts there is no empty list.
+  const silent = reviewBody("C00000001", "1", [
+    { name: "Nick", mentionId: null, average: 3, count: 1, texts: [] },
+  ]);
+  assert.equal((silent.blocks[0].elements as unknown[]).length, 1);
   assert.ok(!JSON.stringify(body).includes('"type":"link"'));
   assert.ok(!JSON.stringify(body).includes('"type":"broadcast"'));
 });

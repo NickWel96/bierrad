@@ -510,6 +510,7 @@ function inline(e) {
   if (e.type === "emoji") return ":" + esc(e.name) + ":";
   if (e.type === "mrkdwn" || e.type === "plain_text") return esc(e.text);
   if (e.type === "rich_text_quote") return "<blockquote>" + (e.elements || []).map(inline).join("") + "</blockquote>";
+  if (e.type === "rich_text_list") return (e.border ? "<blockquote>" : "") + "<ul>" + (e.elements || []).map((s) => "<li>" + (s.elements || []).map(inline).join("") + "</li>").join("") + "</ul>" + (e.border ? "</blockquote>" : "");
   return (e.elements || []).map(inline).join("") + (e.type === "rich_text_section" ? "\\n" : "") +
     (e.text ? inline(e.text) : "") + (e.fields || []).map(inline).join("\\n");
 }

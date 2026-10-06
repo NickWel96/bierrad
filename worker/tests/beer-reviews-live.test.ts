@@ -233,7 +233,7 @@ test(
       const review = posts.at(-1)!;
       assert.equal(review.reply_broadcast, false);
       assert.match(String(review.text), /⭐ Reviews voor /);
-      assert.ok(JSON.stringify(review.blocks).includes("rich_text_quote"));
+      assert.ok(JSON.stringify(review.blocks).includes("rich_text_list"));
       assert.ok(!String(review.text).includes("Erin"));
       // Beer never edits the parent message: it belongs to a person.
       assert.equal(updates, 0);
