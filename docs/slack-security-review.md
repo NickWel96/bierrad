@@ -28,6 +28,12 @@ Automated tests cover strict URL parsing/SSRF cases, complete reactions, dedupli
 
 Production activation requires an installed app with reactions:read/users:read/chat:write, bot conversation membership, SLACK_BOT_TOKEN and a privately provisioned SLACK_START_GRANT. The initial implementation had no bot token configured. On 2026-09-28 the user configured it and demonstrated a successful real thread reply. The new mention rendering still requires a real draw acceptance check. The feature fails closed without both secrets; manual use remains available.
 
+## Decimal rating emoji review — 2026-10-06
+
+Explicitly requested by the owner and reviewed against every section of SECURITY.md. Both anonymous review replies and settled channel calls use exactly five structured `emoji` elements per rated winner. Names come only from the fixed server-side set (`star`, `bierrad_star_empty`, `bierrad_star_1` through `bierrad_star_9`); no user-provided name or image URL is accepted. Round once to one decimal, then use that same value for the star fill and printed score. Fallback text uses fixed emoji shortcodes with the escaped names/text and existing `parse: none` settings. Anonymous review texts remain literal text elements in separate bullets, including emoji-looking strings; only frozen winner identities become mentions. Conflict resolution with PR 34 preserves its separate review bullets alongside the five-star display, with SECURITY.md and synthetic unit/integration assertions aligned to both changes.
+
+No new API endpoint, scope, secret, environment variable, dependency, capability, network request, retention or storage is introduced. Authorization, review eligibility, delivery claims and retry limits are unchanged. PNGs are original deterministic geometric assets without company or employee data. Uploading them is a manual workspace step; no production Slack post or upload was made during validation. SECURITY.md's former whole-star output description is updated to reflect the owner's requested tenths. Tests cover every tenth, rounding carry, both message types, multiple winners and literal review text; existing synthetic Worker integration tests retain their security assertions.
+
 ## Required answers
 
 1. Public URL reveals private participants without a capability? **No.**

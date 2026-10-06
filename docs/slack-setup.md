@@ -103,6 +103,10 @@ Publicatievolgorde: eerst de compatibele Worker, vervolgens de frontend; configu
 
 Het Waterrad gebruikt **dezelfde Koffierad-app** en dezelfde `COFFEE_SLACK_*`-secrets; er is geen aparte app en er zijn geen extra scopes of secrets nodig. **Start met Slack** op het Waterrad (of `#/water-slack`) logt in via de Koffierad-app. Collega's reageren met **💧 `:droplet:`**; ☕ en 🍻 tellen daar nooit mee, en omgekeerd telt 💧 nooit mee voor koffie of bier. De uitslag komt van de Koffierad-bot, met watertekst. Verwijderen van de koffiesecrets schakelt dus ook water uit. Upload eventueel [water-icon.png](../public/water-icon.png) (1024 × 1024, vectorbron [water-icon.svg](../public/water-icon.svg)) als je de app een algemener icoon wilt geven; dat is niet nodig.
 
+## Steremoji's voor beoordelingen
+
+Reviews tonen vijf sterren, inclusief gedeeltelijke sterren op één decimaal. Upload vóór publicatie van de backend de tien transparante PNG's uit [slack-emoji](slack-emoji/README.md) met hun exacte bestandsnamen als emojinaam. De volle ster gebruikt de bestaande `:star:`. Dit geldt voor bier-, koffie- en waterreviews en de bijgewerkte kanaaloproep; er zijn geen extra apprechten nodig.
+
 ## Automatisch verversen en eenmalig starten
 
 De host kan vijfminutenrefresh aanzetten zolang het hostscherm openstaat. Dit bewaart geen deelnemers of toegang in browseropslag. De live-server kan daarnaast een eenmalige start tot 30 dagen vooruit bewaren en de sessie zo nodig verlengen tot één uur daarna (standaard vrijdag 15.45, Europe/Amsterdam). De eindcontrole van Slack loopt op de server en werkt ook zonder hostscherm. Pas na een geslaagde controle volgt de normale trekking en threaduitslag; bij fouten wordt overgeslagen. Een normale import heeft een cooldown van een minuut. De eindcontrole heeft een aparte limiet van één per minuut en zet ook de normale cooldown; een expliciete Slack-retrydeadline geldt voor beide. Zo kan een laatste controle na een recente reguliere import plaatsvinden, met maximaal twee imports per minuut per sessie. Geen nieuwe Slack-scopes, cronconfiguratie of serversecrets nodig. Wekelijkse herhaling is niet inbegrepen.

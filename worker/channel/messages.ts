@@ -1,12 +1,13 @@
 import { channelCopy, type ChannelVariant } from "../../shared/channel";
 import { themes } from "../../shared/variant";
-import { averageFormat, wholeStars } from "../../shared/reviews";
+import { slackRating, type RatingEmoji } from "../slack/rating";
 import { clock } from "../slack/state";
 
 type Element =
   | { type: "text"; text: string; style?: { bold: true; italic?: true } }
   | { type: "link"; url: string; text: string }
-  | { type: "user"; user_id: string };
+  | { type: "user"; user_id: string }
+  | RatingEmoji;
 
 const escape = (text: string) =>
   text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -16,7 +17,13 @@ const fallback = (elements: Element[], names: string[] = []) => {
   return escape(
     elements
       .map((e) =>
-        e.type === "link" ? e.url : e.type === "user" ? names[name++] : e.text,
+        e.type === "link"
+          ? e.url
+          : e.type === "user"
+            ? names[name++]
+            : e.type === "emoji"
+              ? `:${e.name}:`
+              : e.text,
       )
       .join(""),
   );
@@ -122,7 +129,6 @@ export type CallOutcome =
       ratings?: ({ average: number; count: number } | null)[];
     }
   | { kind: "empty" | "unreadable" };
-const stars = (average: number) => "⭐".repeat(wholeStars(average));
 /** Server-frozen identities only; anything else stays literal text. */
 function mention(name: string, id: string | null | undefined): Element {
   return id && /^[UW][A-Z0-9]{8,20}$/.test(id) && id !== "USLACKBOT"
@@ -155,11 +161,14 @@ export function settledCallBody(
       if (index) status.push({ type: "text", text: " · " });
       status.push(mention(name, outcome.mentionIds[index]));
       const rating = ratings?.[index];
-      if (rating && outcome.names.length > 1)
-        status.push({
-          type: "text",
-          text: ` ${stars(rating.average)} ${averageFormat.format(rating.average)}`,
-        });
+      if (rating && outcome.names.length > 1) {
+        const display = slackRating(rating.average);
+        status.push(
+          { type: "text", text: " " },
+          ...display.elements,
+          { type: "text", text: ` ${display.value}` },
+        );
+      }
     });
     const many = outcome.names.length > 1;
     status.push({
@@ -169,11 +178,14 @@ export function settledCallBody(
         : ` ${many ? "halen" : "haalt"} ${theme.drink}`,
     });
     const single = ratings?.length === 1 ? ratings[0] : undefined;
-    if (single)
-      status.push({
-        type: "text",
-        text: ` · ${stars(single.average)} ${averageFormat.format(single.average)}`,
-      });
+    if (single) {
+      const display = slackRating(single.average);
+      status.push(
+        { type: "text", text: " · " },
+        ...display.elements,
+        { type: "text", text: ` ${display.value}` },
+      );
+    }
     if (!ratings && outcome.reviewUntil && reviewLink)
       status.push(
         {
@@ -223,13 +235,16 @@ export function reviewBody(
   const sections: Record<string, unknown>[] = [];
   const plain: string[] = [];
   results.forEach((result, index) => {
+    const display = slackRating(result.average);
     const line: Element[] = [
       { type: "text", text: `${index ? "\n" : ""}⭐ Reviews voor ` },
       mention(result.name, result.mentionId),
-      { type: "text", text: `\n${stars(result.average)}  ` },
+      { type: "text", text: "\n" },
+      ...display.elements,
+      { type: "text", text: "  " },
       {
         type: "text",
-        text: averageFormat.format(result.average),
+        text: display.value,
         style: { bold: true },
       },
       {
@@ -239,7 +254,7 @@ export function reviewBody(
     ];
     sections.push({ type: "rich_text_section", elements: line });
     plain.push(
-      `${index ? "\n" : ""}⭐ Reviews voor ${result.name}\n${stars(result.average)}  ${averageFormat.format(result.average)} gemiddeld · ${result.count} ${result.count === 1 ? "beoordeling" : "beoordelingen"}`,
+      `${index ? "\n" : ""}⭐ Reviews voor ${result.name}\n${display.text}  ${display.value} gemiddeld · ${result.count} ${result.count === 1 ? "beoordeling" : "beoordelingen"}`,
     );
     // Anonymous texts as literal text, one bullet each: Slack would merge
     // consecutive quotes into one.

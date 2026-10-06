@@ -16,7 +16,6 @@ import { beginLogin, parseLoginCookie, LOGIN_COOKIE } from "../slack/login";
 import {
   cleanReviewText,
   validSubmission,
-  wholeStars,
 } from "../../shared/reviews";
 
 const now = Date.parse("2026-10-06T12:00:00Z");
@@ -156,7 +155,7 @@ test("nobody voting posts nothing; nobody able to vote leaves the call alone", (
   assert.ok(r.review!.closesAt! <= r.expiresAt - 60000);
 });
 
-test("the call invites to review while open and shows whole stars after", () => {
+test("the call invites to review while open and shows five decimal stars after", () => {
   const startedAt = Date.parse("2026-10-06T12:58:00Z");
   const base = { kind: "winner" as const, names: ["Nick"], mentionIds: ["U00000001"], participants: 7 };
   const open = settledCallBody("C00000001", "1234567890.123456", startedAt, "coffee", { ...base, reviewUntil: startedAt + 11 * 60000 }, "https://example.test/#/koffie/abc");
@@ -166,15 +165,16 @@ test("the call invites to review while open and shows whole stars after", () => 
   const nolink = settledCallBody("C00000001", "1", startedAt, "coffee", { ...base, reviewUntil: startedAt + 60000 });
   assert.ok(!nolink.text.includes("Beoordeel"));
   const rated = settledCallBody("C00000001", "1", startedAt, "coffee", { ...base, ratings: [{ average: 4.25, count: 6 }] });
-  assert.equal(rated.text, "☕ Koffieronde om 14:58\n🏆 Nick haalde koffie · ⭐⭐⭐⭐ 4,3");
+  assert.equal(rated.text, "☕ Koffieronde om 14:58\n🏆 Nick haalde koffie · :star::star::star::star::bierrad_star_3: 4.3");
+  assert.deepEqual(rated.blocks[0].elements![0].elements.filter((e) => e.type === "emoji"), [
+    ...Array.from({ length: 4 }, () => ({ type: "emoji", name: "star" })),
+    { type: "emoji", name: "bierrad_star_3" },
+  ]);
   assert.equal(rated.blocks[1].elements![0].text, "7 deden mee · 6 beoordelingen in de thread");
   assert.ok(!JSON.stringify(rated).includes("http"));
   const none = settledCallBody("C00000001", "1", startedAt, "water", { ...base, ratings: [null] });
   assert.equal(none.text, "💧 Waterronde om 14:58\n🏆 Nick haalde water");
   assert.equal(none.blocks[1].elements![0].text, "7 deden mee · geen beoordelingen");
-  assert.equal(wholeStars(4.5), 5);
-  assert.equal(wholeStars(4.49), 4);
-  assert.equal(wholeStars(0.2), 1);
 });
 
 test("the review post quotes anonymous texts literally, in the thread only", () => {
