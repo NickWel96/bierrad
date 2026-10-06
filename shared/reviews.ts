@@ -4,7 +4,7 @@ import type { WheelVariant } from "./variant";
 /** Optional text per reviewed winner. */
 export const REVIEW_TEXT_MAX = 280;
 export const REVIEW_MINUTE_CHOICES = [5, 10, 15, 30] as const;
-export const DEFAULT_REVIEW_MINUTES = 10;
+export const DEFAULT_REVIEW_MINUTES = 15;
 /** Personal links per channel; the oldest login makes way for a new one. */
 export const MAX_MEMBERS = 500;
 export const MEMBER_TTL_MS = 30 * 24 * 60 * 60 * 1000;

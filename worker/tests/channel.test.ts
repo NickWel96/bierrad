@@ -482,7 +482,7 @@ test(
       assert.match(watcher, /^[a-z]{2,8}(?:-[a-z]{2,8}){4}$/);
       assert.deepEqual(
         { ...initial, expiresAt: undefined, viewerCapability: undefined },
-        { role: "requester", variant: "coffee", defaultMinutes: 5, roundsLeft: 25, expiresAt: undefined, viewerCapability: undefined, reviews: { enabled: false, minutes: 10 } },
+        { role: "requester", variant: "coffee", defaultMinutes: 5, roundsLeft: 25, expiresAt: undefined, viewerCapability: undefined, reviews: { enabled: false, minutes: 15 } },
       );
       // The confirmation carries only the request link, not the word link.
       assert.ok(!JSON.stringify(posts).includes(watcher));
