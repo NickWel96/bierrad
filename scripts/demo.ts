@@ -366,8 +366,18 @@ async function requestRound() {
     },
     body,
   });
+  // Success is an empty 200; a refusal is an ephemeral reply only "you" would see.
   const reply = await response.text();
-  if (!response.ok || reply) throw new Error(reply || String(response.status));
+  if (!response.ok || reply) {
+    const text = (() => {
+      try {
+        return (JSON.parse(reply) as { text?: string }).text;
+      } catch {
+        return undefined;
+      }
+    })();
+    throw new Error(text ?? (reply || String(response.status)));
+  }
   log("/koffierad 15 getypt; de oproep staat in het nep-Slack-kanaal");
 }
 /** Everyone but you (and the haler, whom the server refuses) votes. */
