@@ -273,6 +273,8 @@ test(
       assert.equal(review.thread_ts, invited.ts);
       assert.equal(review.reply_broadcast, false);
       assert.ok(!String(review.text).includes("<!channel>"));
+      // The winner is a real mention in the fallback, so Slack notifies them.
+      assert.match(String(review.text), /^⭐ Reviews voor <@U[A-Z0-9]+>\n/);
       assert.ok(JSON.stringify(review.blocks).includes(JSON.stringify({ type: "rich_text_section", elements: [{ type: "text", text }] })));
       assert.match(String(review.text), /:star::star::star::star::bierrad_star_5: {2}4\.5 gemiddeld · 2 beoordelingen/);
       const rated = updates.at(-1)!;

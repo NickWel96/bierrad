@@ -28,7 +28,7 @@ Stemmen opent een minuut na de finale (gevraagd door de eigenaar), en de stemtij
 - **Winnaar uitlekken:** stembiljetten openen pas een minuut na de laatste onthulling, en de server weigert te vroege stemmen.
 - **Dubbel stemmen:** één stem per pseudoniem, binnen het Durable Object, zonder await tussen controle en schrijven. Een nieuwe login geeft hetzelfde pseudoniem en dus geen nieuwe stem.
 - **Op jezelf stemmen:** de winnaar staat niet op de lijst van wie mag stemmen (403), en een stembiljet bevat nooit jezelf.
-- **Injectie in Slack:** de teksten staan als tekstelementen in een `rich_text_list`, één bolletje per review, met `parse: none` en een ge-escapete fallback. `<!channel>`, mentions en links blijven letterlijke tekst. De invoer wordt opgeschoond: geen stuurtekens en geen bidi-overrides.
+- **Injectie in Slack:** de teksten staan als tekstelementen in een `rich_text_list`, één bolletje per review, met `parse: none` en een ge-escapete fallback. `<!channel>`, mentions en links blijven letterlijke tekst. Alleen de server-bevroren identiteit van de winnaar staat ook in de fallback als `<@U…>`, omdat Slack daaruit de notificatie afleidt (2026-10-06). De invoer wordt opgeschoond: geen stuurtekens en geen bidi-overrides.
 - **Herleidbaarheid:** bij het posten worden de teksten geschud en blijven er geen stemmen per persoon over. Na ontkoppelen is de sleutel weg.
 - **Linklekken:** de kanaallink staat nooit in een backend-URL. De CSP `form-action` staat alleen self, de backend en slack.com toe. De oproep linkt alleen bij rondes met reviews naar de kanaalpagina; die link stond al in het koppelbericht.
 

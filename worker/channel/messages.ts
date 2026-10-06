@@ -253,8 +253,11 @@ export function reviewBody(
       },
     ];
     sections.push({ type: "rich_text_section", elements: line });
+    // Slack notifies from the fallback text, so the frozen identity is a real
+    // mention there too; everything else is escaped.
+    const who = line[1];
     plain.push(
-      `${index ? "\n" : ""}⭐ Reviews voor ${result.name}\n${display.text}  ${display.value} gemiddeld · ${result.count} ${result.count === 1 ? "beoordeling" : "beoordelingen"}`,
+      `${escape(`${index ? "\n" : ""}⭐ Reviews voor `)}${who.type === "user" ? `<@${who.user_id}>` : escape(result.name)}${escape(`\n${display.text}  ${display.value} gemiddeld · ${result.count} ${result.count === 1 ? "beoordeling" : "beoordelingen"}`)}`,
     );
     // Anonymous texts as literal text, one bullet each: Slack would merge
     // consecutive quotes into one.
@@ -267,12 +270,12 @@ export function reviewBody(
           elements: [{ type: "text", text }],
         })),
       });
-    for (const text of result.texts) plain.push(`• ${text}`);
+    for (const text of result.texts) plain.push(escape(`• ${text}`));
   });
   return {
     channel: channelId,
     thread_ts: threadTs,
-    text: escape(plain.join("\n")),
+    text: plain.join("\n"),
     blocks: [
       { type: "rich_text", elements: sections },
       {
