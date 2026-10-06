@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   ChannelApiError,
   channelRequest,
@@ -93,4 +94,17 @@ test("session join routes accept only exact hex links and known login failures",
     "#/meedoen",
   ])
     assert.equal(parseJoinRoute(hash), null, hash);
+});
+
+test("login forms send their Origin: strict-origin page policy, no noreferrer on the form", () => {
+  // Under no-referrer browsers send "Origin: null" with a cross-origin form
+  // POST, and /auth/slack/member and /auth/slack/join refuse every login.
+  const page = readFileSync("index.html", "utf8");
+  assert.match(page, /<meta name="referrer" content="strict-origin" \/>/);
+  assert.doesNotMatch(page, /content="no-referrer"/);
+  const form = /<form[\s\S]*?>/.exec(
+    readFileSync("src/components/ReviewBallot.tsx", "utf8"),
+  )![0];
+  assert.match(form, /method="post"/);
+  assert.doesNotMatch(form, /noreferrer/);
 });
