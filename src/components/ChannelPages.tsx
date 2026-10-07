@@ -31,6 +31,7 @@ import {
   type MemberLoginFailure,
 } from "../sessions/ChannelClient";
 import { ReviewBallotCard, ReviewJoin, ReviewThanks } from "./ReviewBallot";
+import { RoundExplainer } from "./RoundExplainer";
 import { configuredApiUrl } from "../sessions/liveNavigation";
 import { RemoteSessionController } from "../sessions/RemoteSessionController";
 import App from "../App";
@@ -141,6 +142,7 @@ export function ChannelBindPage({ failure }: { failure?: ChannelBindFailure }) {
           <code>/waterrad</code> of <code>/koekrad</code> typt in het kanaal,
           start een koffie-, water- of koekronde.
         </p>
+        <RoundExplainer />
         <p>
           <a href="#/coffee">Liever handmatig draaien</a>
         </p>

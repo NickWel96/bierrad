@@ -1715,6 +1715,199 @@ footer b {
   border-radius: 5px;
   background: var(--strip-bg);
 }
+/* How a round goes: five static pictures under the bind form. */
+.round-explainer {
+  /* Wider than the bind form: the centred column lets it spill out evenly. */
+  width: min(1080px, calc(100vw - 48px));
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+.round-explainer h2 {
+  margin: 0 0 14px;
+  font-size: 20px;
+}
+.round-explainer ol {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+.round-explainer li {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 2px 8px var(--shadow-card);
+  text-align: left;
+  counter-increment: step;
+  animation: explainer-in 0.4s ease-out both;
+}
+.round-explainer li:nth-child(2) { animation-delay: 0.08s; }
+.round-explainer li:nth-child(3) { animation-delay: 0.16s; }
+.round-explainer li:nth-child(4) { animation-delay: 0.24s; }
+.round-explainer li:nth-child(5) { animation-delay: 0.32s; }
+.round-explainer h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 16px;
+}
+.round-explainer h3::before {
+  content: counter(step);
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--primary-text);
+  font-size: 13px;
+}
+.round-explainer p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text-soft);
+}
+.explainer-shot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 132px;
+  margin-top: auto;
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--tint);
+  font-size: 13px;
+}
+.explainer-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  font-family: ui-monospace, monospace;
+  box-sizing: border-box;
+}
+.explainer-caret {
+  display: inline-block;
+  width: 1px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--text);
+  animation: explainer-blink 1s steps(1) infinite;
+}
+.explainer-message,
+.explainer-ballot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  width: 100%;
+  padding: 8px 10px;
+  border-left: 3px solid var(--primary);
+  border-radius: 6px;
+  background: var(--surface-strong);
+  box-sizing: border-box;
+}
+.explainer-message small,
+.explainer-ballot small {
+  color: var(--text-muted);
+}
+.explainer-link {
+  color: var(--focus);
+  text-decoration: underline;
+}
+.explainer-reaction {
+  margin-top: 3px;
+  padding: 1px 8px;
+  border: 1px solid var(--primary);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+.explainer-mention {
+  padding: 0 3px;
+  border-radius: 4px;
+  background: var(--tint-warm);
+  color: var(--accent-text-strong);
+  font-weight: 600;
+}
+.explainer-ballot {
+  align-items: center;
+  border-left: none;
+  text-align: center;
+}
+.explainer-stars {
+  font-size: 22px;
+  letter-spacing: 2px;
+  color: var(--star-on);
+}
+.explainer-stars span {
+  color: var(--star-off);
+}
+.explainer-wheel {
+  width: 104px;
+  height: 104px;
+  filter: drop-shadow(0 2px 4px var(--shadow-wheel));
+}
+.explainer-wheel path:not(.explainer-pointer) {
+  stroke: var(--wheel-face);
+  stroke-width: 1.5;
+}
+.explainer-wheel text {
+  fill: var(--wheel-ink);
+  font-size: 10px;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+.explainer-rim {
+  fill: none;
+  stroke: var(--wheel-rim);
+  stroke-width: 3;
+}
+.explainer-hub {
+  fill: var(--hub-bg);
+  stroke: var(--wheel-rim);
+  stroke-width: 2;
+}
+.explainer-pointer {
+  fill: var(--primary);
+  stroke: var(--wheel-rim);
+  stroke-width: 1.5;
+}
+.explainer-count {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+@keyframes explainer-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes explainer-blink {
+  50% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .round-explainer li,
+  .explainer-caret {
+    animation: none;
+  }
+}
 /* Fixed channel page: a slim strip above the latest round's live wheel. */
 .channel-live {
   height: 100svh;
