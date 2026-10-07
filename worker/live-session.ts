@@ -1,6 +1,6 @@
 import { isChannelVariant, type ChannelVariant } from "../shared/channel";
 import { reviewBody, settledCallBody } from "./channel/messages";
-import { themes, type WheelVariant } from "../shared/variant";
+import { roundTitle, themes, type WheelVariant } from "../shared/variant";
 import { SlackApiClient, SlackError } from "./slack/api";
 import {
   SlackReactionParticipantSource,
@@ -115,7 +115,7 @@ export class LiveSession extends DurableObject<Env & SlackSecrets> {
     return new Date(record.expiresAt).toISOString();
   }
   /**
-   * A coffee or water round of a channel-bound Koffierad: spectators only, one winner, the Slack
+   * A coffee, water or Koekrad round of a channel-bound Koffierad: spectators only, one winner, the Slack
    * call message as source and a fixed start. Nobody receives host rights.
    */
   async initializeChannelRound(
@@ -125,6 +125,7 @@ export class LiveSession extends DurableObject<Env & SlackSecrets> {
     excludeUserIds: string[],
     variant: ChannelVariant = "coffee",
     review?: { minutes: number; key: string; link: string },
+    title?: string,
   ): Promise<void> {
     const hostHash = await hashSecret(randomHex());
     if (this.read()) throw new Error("unavailable");
@@ -133,6 +134,9 @@ export class LiveSession extends DurableObject<Env & SlackSecrets> {
     );
     const now = Date.now();
     const record = newSession(hostHash, spectatorHash, now, variant);
+    // Validated again: only a Koekrad round carries a word.
+    const word = variant === "cookie" ? roundTitle(title) : undefined;
+    if (word) record.title = word;
     record.preferredCount = 1;
     record.session = createSession(record.session.id, [], 1);
     record.expiresAt = startAt + SCHEDULE_RETENTION_MS;
@@ -1155,6 +1159,7 @@ export class LiveSession extends DurableObject<Env & SlackSecrets> {
         variant,
         card,
         record.review?.status === "open" ? record.review.link : undefined,
+        record.title,
       ),
     );
     const latest = this.read();

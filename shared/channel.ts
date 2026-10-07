@@ -1,9 +1,9 @@
 /** Public contract for channel-bound Koffierad wheels. No secrets or Slack IDs. */
-import type { WheelVariant } from "./variant";
+import { roundTitle, type WheelVariant } from "./variant";
 import type { ReviewBallot, ReviewSettings } from "./reviews";
 /** What a channel round fetches; one binding serves both. */
-export type ChannelVariant = Extract<WheelVariant, "coffee" | "water">;
-export const channelVariants: readonly ChannelVariant[] = ["coffee", "water"];
+export type ChannelVariant = Extract<WheelVariant, "coffee" | "water" | "cookie">;
+export const channelVariants: readonly ChannelVariant[] = ["coffee", "water", "cookie"];
 export function isChannelVariant(value: unknown): value is ChannelVariant {
   return (channelVariants as readonly unknown[]).includes(value);
 }
@@ -24,7 +24,21 @@ export const channelCopy: Record<
     rounds: "waterrondes",
     tap: "tappen",
   },
+  cookie: {
+    command: "/koekrad",
+    round: "koekronde",
+    rounds: "koekrondes",
+    tap: "halen",
+  },
 };
+/** A round's copy; a Koekrad round with a valid title takes that word. */
+export function roundCopy(variant: ChannelVariant, title?: string) {
+  const word = variant === "cookie" ? roundTitle(title) : undefined;
+  const copy = channelCopy[variant];
+  return word
+    ? { ...copy, round: `${word}ronde`, rounds: `${word}rondes` }
+    : copy;
+}
 export const DEFAULT_ROUND_MINUTES = 5;
 export const MAX_ROUND_MINUTES = 30;
 /** Rounds per channel per rolling 24 hours. */
@@ -44,6 +58,8 @@ export interface ChannelRound {
   active: boolean;
   /** Whether this round's winner can be reviewed. */
   reviews?: boolean;
+  /** Koekrad only: the word from `/koekrad <titel>`; display only. */
+  title?: string;
 }
 export interface ChannelStatus {
   /** `member`: a personal link from Sign in with Slack; requests rounds and reviews. */
@@ -56,7 +72,7 @@ export interface ChannelStatus {
   expiresAt: string;
   /** View-only word link of the channel, easy to type on another screen. */
   viewerCapability?: string;
-  /** Channel name from the last signed `/koffierad` or `/waterrad`, without `#`; display only. */
+  /** Channel name from the last signed slash command, without `#`; display only. */
   channelName?: string;
   reviews?: ReviewSettings;
   /** Personal links only: about this person, never about anyone else. */
@@ -65,7 +81,7 @@ export interface ChannelStatus {
     ballot?: ReviewBallot;
   };
 }
-/** Rounds start only from a signed `/koffierad` or `/waterrad`, never with a link. */
+/** Rounds start only from a signed `/koffierad`, `/waterrad` or `/koekrad`, never with a link. */
 export type ChannelCommand =
   | { type: "setDefaultMinutes"; minutes: number }
   | { type: "setReviews"; enabled: boolean; minutes: number }

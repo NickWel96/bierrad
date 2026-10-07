@@ -47,6 +47,8 @@ export class RequestError extends Error {
 }
 export interface StoredSession {
   variant?: WheelVariant;
+  /** Koekrad rounds only: the validated word from `/koekrad <titel>`; display only. */
+  title?: string;
   session: BeerWheelSession;
   hostHash: string;
   spectatorHash: string;
@@ -91,6 +93,7 @@ export function publicSession(record: StoredSession): PublicBeerWheelSession {
   const s = record.session;
   return {
     variant: record.variant ?? "beer",
+    ...(record.title ? { title: record.title } : {}),
     participants: s.participants.map((p) => ({ id: p.id, name: p.name })),
     winnerCount: s.winnerCount,
     state: s.state,

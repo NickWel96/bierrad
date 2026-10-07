@@ -1,10 +1,10 @@
-import { VariantContext, useTheme } from "./Theme";
+import { RoundTitleContext, VariantContext, useTheme } from "./Theme";
 import {
   localHash,
   localVariant,
   retiredRoute,
   startsWithSlack,
-  themes,
+  themeFor,
   type WheelVariant,
 } from "../shared/variant";
 import { useEffect, useState, useSyncExternalStore } from "react";
@@ -145,15 +145,19 @@ function SessionTheme({
     controller.getSnapshot,
   );
   const variant = snapshot.session.variant ?? fallback;
+  const title = snapshot.session.title;
   useEffect(() => {
+    const theme = themeFor(variant, title);
     document.documentElement.dataset.variant = variant;
-    document.title = themes[variant].name + " — Wie haalt de volgende ronde?";
+    document.title = theme.name + " — Wie haalt de volgende ronde?";
     const icon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
-    if (icon) icon.href = themes[variant].favicon;
-  }, [variant]);
+    if (icon) icon.href = theme.favicon;
+  }, [variant, title]);
   return (
     <VariantContext.Provider value={variant}>
-      {children}
+      <RoundTitleContext.Provider value={title}>
+        {children}
+      </RoundTitleContext.Provider>
     </VariantContext.Provider>
   );
 }

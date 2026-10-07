@@ -6,20 +6,20 @@ import {
   type ReactNode,
 } from "react";
 import {
-  channelCopy,
   MAX_ROUND_MINUTES,
+  roundCopy,
   parseChannelInput,
   type ChannelCommand,
   type ChannelRound,
   type ChannelStatus,
   type ChannelVariant,
 } from "../../shared/channel";
-import { themes } from "../../shared/variant";
+import { themeFor, themes } from "../../shared/variant";
 import {
   DEFAULT_REVIEW_SETTINGS,
   REVIEW_MINUTE_CHOICES,
 } from "../../shared/reviews";
-import { VariantContext } from "../Theme";
+import { RoundTitleContext, VariantContext } from "../Theme";
 import {
   channelBindUrl,
   ChannelApiError,
@@ -41,22 +41,25 @@ const clock = new Intl.DateTimeFormat("nl-NL", {
   hour: "2-digit",
   minute: "2-digit",
 });
-/** The name arrives with the first `/koffierad` or `/waterrad`; until then, no name. */
-function channelTitle(variant: ChannelVariant, name?: string) {
-  const { icon, name: wheel } = themes[variant];
+/** The name arrives with the first slash command; until then, no name. */
+function channelTitle(variant: ChannelVariant, name?: string, word?: string) {
+  const { icon, name: wheel } = themeFor(variant, word);
   return name ? `${icon} ${wheel} van #${name}` : `${icon} ${wheel} van dit kanaal`;
 }
-/** One binding serves coffee and water: the page follows the latest round. */
+/** One binding serves coffee, water and cookie: the page follows the latest round. */
 function ChannelTheme({
   variant,
+  word,
   title,
   children,
 }: {
   variant: ChannelVariant;
+  /** Koekrad rounds: the round's word. */
+  word?: string;
   title?: string;
   children: ReactNode;
 }) {
-  const theme = themes[variant];
+  const theme = themeFor(variant, word);
   useEffect(() => {
     document.documentElement.dataset.variant = variant;
     document.title = title ?? theme.name;
@@ -64,11 +67,13 @@ function ChannelTheme({
     if (icon) icon.href = theme.favicon;
   }, [variant, title, theme]);
   return (
-    <VariantContext.Provider value={variant}>{children}</VariantContext.Provider>
+    <VariantContext.Provider value={variant}>
+      <RoundTitleContext.Provider value={word}>{children}</RoundTitleContext.Provider>
+    </VariantContext.Provider>
   );
 }
-function roundLabel(variant: ChannelVariant) {
-  const round = channelCopy[variant].round;
+function roundLabel(variant: ChannelVariant, word?: string) {
+  const round = roundCopy(variant, word).round;
   return `${round[0].toUpperCase()}${round.slice(1)}`;
 }
 const bindFailures: Record<ChannelBindFailure, string> = {
@@ -91,7 +96,7 @@ export function ChannelBindPage({ failure }: { failure?: ChannelBindFailure }) {
   return (
     <ChannelTheme variant="coffee" title="Koffierad koppelen">
       <div className="unavailable channel-page">
-        <h1>☕💧 Koffierad aan een kanaal koppelen</h1>
+        <h1>☕💧🍪 Koffierad aan een kanaal koppelen</h1>
         <ol className="channel-steps">
           <li>
             Nodig de Koffierad-bot uit in het kanaal: typ daar{" "}
@@ -132,9 +137,9 @@ export function ChannelBindPage({ failure }: { failure?: ChannelBindFailure }) {
           <p>Koppelen is hier nog niet ingesteld.</p>
         )}
         <p className="helper">
-          Iedere afdeling kan een eigen kanaal koppelen. Wie <code>/koffierad</code>{" "}
-          of <code>/waterrad</code> typt in het kanaal, start een koffie- of
-          waterronde.
+          Iedere afdeling kan een eigen kanaal koppelen. Wie <code>/koffierad</code>,{" "}
+          <code>/waterrad</code> of <code>/koekrad</code> typt in het kanaal,
+          start een koffie-, water- of koekronde.
         </p>
         <p>
           <a href="#/coffee">Liever handmatig draaien</a>
@@ -172,7 +177,7 @@ export function ChannelMemberFailurePage({
 
 /**
  * The channel's fixed wheel: watch, log in to review and, for admins, manage the
- * binding. Rounds start in Slack with /koffierad or /waterrad, not here.
+ * binding. Rounds start in Slack with a slash command, not here.
  */
 export function ChannelWheelPage({
   capability,
@@ -216,7 +221,7 @@ export function ChannelWheelPage({
         if ((error as { code?: string }).code === "unavailable") setGone("gone");
       });
     refresh();
-    // Picks up rounds started elsewhere (for example with /koffierad or /waterrad).
+    // Picks up rounds started elsewhere (for example with /koffierad or /koekrad).
     const timer = setInterval(refresh, 10000);
     window.addEventListener("focus", refresh);
     return () => {
@@ -274,7 +279,7 @@ export function ChannelWheelPage({
               ? "Deze persoonlijke link werkt niet meer. Open een ronde via de oproep in Slack om opnieuw in te loggen."
               : gone
                 ? "De koppeling is opgeheven of deze link is vervangen. Vraag de beheerder van het kanaal om de nieuwe link."
-                : "Live koffie- en waterrondes zijn hier nog niet ingesteld."}
+                : "Live kanaalrondes zijn hier nog niet ingesteld."}
           </p>
           <a href="#/coffee">Open een lokaal Koffierad</a>
         </div>
@@ -289,6 +294,7 @@ export function ChannelWheelPage({
       </ChannelTheme>
     );
   const variant = status.round?.variant ?? status.variant ?? "coffee";
+  const word = status.round?.title;
   const reviews = status.reviews ?? DEFAULT_REVIEW_SETTINGS;
   const member = status.role === "member";
   const ballot = status.member?.ballot;
@@ -363,13 +369,13 @@ export function ChannelWheelPage({
   // The fixed channel page: the latest round's live wheel, then the next request.
   if (status.round)
     return (
-      <ChannelTheme variant={variant}>
+      <ChannelTheme variant={variant} word={word}>
         <div className="channel-live">
           <div className="channel-strip" aria-live="polite">
-            <strong>{channelTitle(variant, status.channelName)}</strong>
+            <strong>{channelTitle(variant, status.channelName, word)}</strong>
             {status.round.active ? (
               <span>
-                {roundLabel(variant)}! Het rad draait om{" "}
+                {roundLabel(variant, word)}! Het rad draait om{" "}
                 {clock.format(Date.parse(status.round.startAt))}
                 <ServerTimeLeft
                   controller={live}
@@ -379,7 +385,7 @@ export function ChannelWheelPage({
                 {themes[variant].icon} onder de oproep in Slack om mee te doen.
               </span>
             ) : (
-              <span>Typ /koffierad of /waterrad in het kanaal voor een nieuwe ronde.</span>
+              <span>Typ /koffierad, /waterrad of /koekrad in het kanaal voor een nieuwe ronde.</span>
             )}
             {viewLink}
             <ReviewProgressNote controller={live} />
@@ -399,13 +405,15 @@ export function ChannelWheelPage({
         <span className="friday-badge">{channelTitle(variant, status.channelName)}</span>
         {memberBar}
         {ballotCard}
-        <h1>Tijd voor koffie of water?</h1>
+        <h1>Tijd voor koffie, water of koek?</h1>
         <section className="channel-request">
           <p>
-            Typ <code>/koffierad</code> of <code>/waterrad</code> in het
-            Slack-kanaal, bijvoorbeeld <code>/waterrad 10</code> voor tien
-            minuten. Wie op ☕ of 💧 onder de oproep klikt, doet mee. Na de
-            wachttijd draait het rad hier vanzelf en kiest het één haler.
+            Typ <code>/koffierad</code>, <code>/waterrad</code> of{" "}
+            <code>/koekrad</code> in het Slack-kanaal, bijvoorbeeld{" "}
+            <code>/waterrad 10</code> voor tien minuten of{" "}
+            <code>/koekrad taart 10</code> voor een taartronde. Wie op ☕, 💧 of
+            🍪 onder de oproep klikt, doet mee. Na de wachttijd draait het rad
+            hier vanzelf en kiest het één haler.
           </p>
           {status.roundsLeft === 0 && (
             <p className="helper">Vandaag zijn er genoeg rondes geweest. Morgen weer!</p>
@@ -426,6 +434,7 @@ export function ChannelViewPage({ capability }: { capability: string }) {
   const [round, setRound] = useState<ChannelRound | null>();
   const [channelName, setChannelName] = useState<string>();
   const [shown, setShown] = useState<ChannelVariant>("coffee");
+  const [word, setWord] = useState<string>();
   const [gone, setGone] = useState(false);
   const live = useRoundController(api, round?.spectatorCapability);
   useEffect(() => {
@@ -438,6 +447,7 @@ export function ChannelViewPage({ capability }: { capability: string }) {
             setRound(result.round ?? null);
             setChannelName(result.channelName);
             setShown(result.round?.variant ?? result.variant ?? "coffee");
+            setWord(result.round?.title);
           }
         },
         (error: Error) => {
@@ -462,7 +472,7 @@ export function ChannelViewPage({ capability }: { capability: string }) {
           <p>
             {gone
               ? "Deze meekijklink is vervangen of de koppeling is opgeheven. Vraag de beheerder van het kanaal om de nieuwe link."
-              : "Live koffie- en waterrondes zijn hier nog niet ingesteld."}
+              : "Live kanaalrondes zijn hier nog niet ingesteld."}
           </p>
           <a href="#/coffee">Open een lokaal Koffierad</a>
         </div>
@@ -478,14 +488,14 @@ export function ChannelViewPage({ capability }: { capability: string }) {
     );
   if (round)
     return (
-      <ChannelTheme variant={shown}>
+      <ChannelTheme variant={shown} word={word}>
         <div className="channel-live">
           <div className="channel-strip" aria-live="polite">
-            <strong>{channelTitle(shown, channelName)}</strong>
+            <strong>{channelTitle(shown, channelName, word)}</strong>
             <span>
               {round.active ? (
                 <>
-                  {roundLabel(shown)}! Het rad draait om{" "}
+                  {roundLabel(shown, word)}! Het rad draait om{" "}
                   {clock.format(Date.parse(round.startAt))}
                   <ServerTimeLeft
                     controller={live}
@@ -495,7 +505,7 @@ export function ChannelViewPage({ capability }: { capability: string }) {
                   mee te doen.
                 </>
               ) : (
-                "Typ /koffierad of /waterrad in het kanaal voor een nieuwe ronde."
+                "Typ /koffierad, /waterrad of /koekrad in het kanaal voor een nieuwe ronde."
               )}
             </span>
             <ReviewProgressNote controller={live} />
@@ -508,10 +518,10 @@ export function ChannelViewPage({ capability }: { capability: string }) {
     <ChannelTheme variant={shown}>
       <div className="unavailable channel-page" aria-live="polite">
         <span className="friday-badge">{channelTitle(shown, channelName)}</span>
-        <h1>Tijd voor koffie of water?</h1>
+        <h1>Tijd voor koffie, water of koek?</h1>
         <p>
-          Typ <code>/koffierad</code> of <code>/waterrad</code> in het
-          Slack-kanaal. Zodra er een ronde is, draait het rad hier vanzelf.
+          Typ <code>/koffierad</code>, <code>/waterrad</code> of{" "}
+          <code>/koekrad</code> in het Slack-kanaal. Zodra er een ronde is, draait het rad hier vanzelf.
         </p>
       </div>
     </ChannelTheme>

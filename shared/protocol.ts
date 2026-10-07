@@ -39,6 +39,8 @@ export type SlackReminderStatus =
 /** Explicit DTO; never serialize backend storage directly. */
 export interface PublicBeerWheelSession {
   variant?: WheelVariant;
+  /** Koekrad rounds only: the validated word from `/koekrad <titel>`. */
+  title?: string;
   participants: readonly Participant[];
   winnerCount: number;
   state: DrawState;

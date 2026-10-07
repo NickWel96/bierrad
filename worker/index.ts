@@ -24,7 +24,7 @@ import {
 } from "./auth";
 import { frontend, json, readBody, readFormBody, redirect } from "./http";
 import { RequestError } from "./session";
-import { channelCopy, validRoundMinutes } from "../shared/channel";
+import { channelCopy, roundCopy, validRoundMinutes } from "../shared/channel";
 import { channelLocator, channelViewerLocator } from "./channel/wheel";
 import {
   ephemeral,
@@ -291,7 +291,7 @@ async function slackAuth(
 }
 
 /**
- * `/koffierad [minuten]` and `/waterrad [minuten]` from Slack. Server-to-server: no Origin or capability,
+ * `/koffierad [minuten]`, `/waterrad [minuten]` and `/koekrad [titel] [minuten]` from Slack. Server-to-server: no Origin or capability,
  * authorized solely by the Koffierad app's request signature.
  */
 async function slashCommand(
@@ -331,10 +331,10 @@ async function slashCommand(
       !(await env.CREATION_GLOBAL.limit({ key: "creation" })).success
     )
       return ephemeral(`${icon} Even rustig aan. Probeer het over een minuut opnieuw.`);
-    // Coffee and water share the channel's one binding and its round limits.
+    // Coffee, water and cookie share the channel's one binding and its round limits.
     const work = env.CHANNELS.getByName(
       await channelLocator(command.channelId),
-    ).slash(command.minutes, command.channelName, command.variant);
+    ).slash(command.minutes, command.channelName, command.variant, command.title);
     // Slack waits about three seconds; the round continues after we answer.
     ctx.waitUntil(work.catch(() => undefined));
     const reply = await Promise.race([
@@ -345,7 +345,7 @@ async function slashCommand(
         setTimeout(
           () =>
             resolve(
-              `${icon} De ${channelCopy[command.variant].round} wordt aangevraagd. Kijk zo in het kanaal.`,
+              `${icon} De ${roundCopy(command.variant, command.title).round} wordt aangevraagd. Kijk zo in het kanaal.`,
             ),
           2500,
         ),

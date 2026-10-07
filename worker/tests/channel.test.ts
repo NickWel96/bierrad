@@ -67,6 +67,47 @@ test("slash command text is strict: minutes, help or nothing", () => {
     minutes: 10,
   });
   assert.deepEqual(parse({ command: "/waterrad", text: "hulp" }), { kind: "help", variant: "water" });
+  // /koekrad takes one optional word before the optional minutes.
+  const cookie = { kind: "round", variant: "cookie", channelId: "C00000001", userId: "U00000001" };
+  assert.deepEqual(parse({ command: "/koekrad" }), cookie);
+  assert.deepEqual(parse({ command: "/koekrad", text: "5" }), { ...cookie, minutes: 5 });
+  assert.deepEqual(parse({ command: "/koekrad", text: "koek" }), { ...cookie, title: "koek" });
+  assert.deepEqual(parse({ command: "/koekrad", text: "koek 5" }), { ...cookie, minutes: 5, title: "koek" });
+  assert.deepEqual(parse({ command: "/koekrad", text: " Taart  10 min " }), { ...cookie, minutes: 10, title: "taart" });
+  assert.deepEqual(parse({ command: "/koekrad", text: "crème-brûlée 3m" }), { ...cookie, minutes: 3, title: "crème-brûlée" });
+  assert.deepEqual(parse({ command: "/koekrad", text: "ijs" }), { ...cookie, title: "ijs" });
+  assert.equal((parse({ command: "/koekrad", text: "ab" }) as { title?: string }).title, "ab");
+  assert.equal((parse({ command: "/koekrad", text: "a".repeat(20) }) as { title?: string }).title, "a".repeat(20));
+  // Anything that is not one plain word gets the help text: no mentions, links, emoji, markup or digits.
+  for (const text of [
+    "help",
+    "a 5",
+    "a".repeat(21),
+    "appel taart 5",
+    "5 koek",
+    "koek5",
+    "<!channel>",
+    "<!here> 5",
+    "@koek",
+    ":cookie:",
+    "*koek*",
+    "_koek_",
+    "~koek~",
+    "`koek`",
+    "koek.nl",
+    "https://x",
+    "koek/taart",
+    "koek&taart",
+    "-koek",
+    "koek-",
+    "koek--taart",
+    "koek'",
+    "k\u00f6ek\u200b",
+  ])
+    assert.equal(parse({ command: "/koekrad", text }).kind, "help", text);
+  // Only the Koekrad takes a word.
+  assert.equal(parse({ text: "koek 5" }).kind, "help");
+  assert.equal(parse({ command: "/waterrad", text: "koek" }).kind, "help");
   assert.equal(parse({ command: "/Waterrad" }).kind, "invalid");
   assert.equal(parse({ command: "/waterrad", channel_id: "D00000001" }).kind, "wrongChannel");
   assert.equal((parse({ text: "10" }) as { minutes: number }).minutes, 10);
@@ -138,9 +179,26 @@ test("channel messages are fixed text with server-built links, never broadcast o
   assert.doesNotMatch(JSON.stringify(water), /☕|koffie/i);
   assert.equal(water.unfurl_links, false);
   assert.equal("reply_broadcast" in water, false);
+  // Koekrad calls take the round's word; without one they are koekrondes.
+  const plain = callBody("C00000001", link, now + 60000, "cookie");
+  assert.match(plain.text, /^🍪 Koekronde om 10:01\nKlik op 🍪 hieronder/);
+  const taart = callBody("C00000001", link, now + 60000, "cookie", undefined, "taart");
+  assert.match(taart.text, /^🍪 Taartronde om 10:01\nKlik op 🍪 hieronder/);
+  assert.equal(taart.blocks[1].elements![0].text, "Het Taartrad kiest één taarthaler.");
+  assert.equal(taart.mrkdwn, false);
+  assert.equal(taart.unfurl_links, false);
+  // A word is only ever validated text: anything else falls back to the plain Koekrad.
+  const forged = callBody("C00000001", link, now + 60000, "cookie", undefined, "<!channel>");
+  assert.match(forged.text, /^🍪 Koekronde om 10:01/);
+  assert.doesNotMatch(JSON.stringify(forged), /channel>/);
+  // Coffee and water never take a word.
+  assert.match(callBody("C00000001", link, now + 60000, "coffee", undefined, "taart").text, /^☕ Koffieronde/);
+  const settled = settledCallBody("C00000001", "1234567890.123456", now + 60000, "cookie", { kind: "empty" }, undefined, "taart");
+  assert.match(settled.text, /^🍪 Taartronde om 10:01\nNiemand deed mee/);
   const bound = boundBody("C00000001", "https://example.test/#/koffie/abc");
   assert.match(bound.text, /\/koffierad/);
   assert.match(bound.text, /\/waterrad/);
+  assert.match(bound.text, /\/koekrad/);
 });
 
 test("a settled round rewrites its own call: winner as mention, notices as fixed text, no link", () => {
@@ -295,6 +353,7 @@ test(
     const userLookups: string[] = [];
     const reactors = ["UBOT00001", "U00000001", "U00000002"];
     const drinkers = ["UBOT00001", "U00000003"];
+    const bakers = ["UBOT00001", "U00000001"];
     const mf = new Miniflare(
       convertV4MiniflareOptions({
         workers: [
@@ -380,6 +439,8 @@ test(
                       { name: "coffee", count: reactors.length, users: reactors },
                       // Only water rounds count these; coffee rounds ignore them.
                       { name: "droplet", count: drinkers.length, users: drinkers },
+                      // Only Koekrad rounds count these.
+                      { name: "cookie", count: bakers.length, users: bakers },
                     ],
                   },
                 });
@@ -668,6 +729,54 @@ test(
       assert.equal(idle.round, undefined);
       assert.equal(idle.variant, "water");
       assert.equal(idle.roundsLeft, 22);
+
+      // Koekrad: /koekrad with a word on the same binding; the word names the round, only :cookie: counts.
+      const baked = await slash({ command: "/koekrad", text: "Taart 2" });
+      assert.equal(baked.status, 200);
+      assert.equal(await baked.text(), "");
+      const cookieCall = posts.at(-1)!;
+      assert.match(String(cookieCall.text), /^🍪 Taartronde om \d\d:\d\d\nKlik op 🍪 hieronder/);
+      assert.ok(JSON.stringify(cookieCall.blocks).includes("Het Taartrad kiest één taarthaler."));
+      assert.equal(cookieCall.mrkdwn, false);
+      assert.equal(reactionsAdded.at(-1)!.name, "cookie");
+      const cookieStatus = ((await status(requester)) as { status: { variant: string; round: { variant: string; title?: string; spectatorCapability: string } } }).status;
+      assert.equal(cookieStatus.variant, "cookie");
+      assert.equal(cookieStatus.round.variant, "cookie");
+      assert.equal(cookieStatus.round.title, "taart");
+      assert.equal(((await status(watcher)) as { round?: { title?: string } }).round?.title, "taart");
+      // A busy channel names the running round by its word.
+      const cookieBusy = (await (await slash({ command: "/waterrad" })).json()) as { text: string };
+      assert.match(cookieBusy.text, /^🍪 Er loopt al een taartronde/);
+      const cookieViewer = cookieStatus.round.spectatorCapability;
+      const cookieSession = sessions.get(sessions.idFromName(await wordLocator(cookieViewer))) as unknown as {
+        due(): Promise<void>;
+        postNow(): Promise<void>;
+        land(): Promise<void>;
+      };
+      const cookieSnapshot = async () => {
+        const r = await mf.dispatchFetch("http://localhost/api/session", {
+          headers: { Origin: "http://127.0.0.1:5173", Authorization: `Bearer ${cookieViewer}` },
+        });
+        return ((await r.json()) as { session: PublicBeerWheelSession }).session;
+      };
+      assert.equal((await cookieSnapshot()).variant, "cookie");
+      assert.equal((await cookieSnapshot()).title, "taart");
+      await cookieSession.due();
+      // Only the 🍪 reactor joins; ☕ and 💧 reactors and the bot never do.
+      assert.deepEqual((await cookieSnapshot()).participants.map((p) => p.name), ["Alice"]);
+      await cookieSession.postNow();
+      await cookieSession.postNow();
+      assert.match(String(updates.at(-1)!.text), /^🍪 Taartronde om \d\d:\d\d\n🏆 Alice haalt taart$/);
+      const cookieResult = posts.findLast((p) => p.thread_ts === cookieCall.ts || String(p.text).includes("Jij mag taart halen!"))!;
+      assert.match(String(cookieResult.text), /^🍪 .*Jij mag taart halen!/s);
+      await cookieSession.land();
+      await channel.finishRound();
+      // The word goes with the round; an idle screen keeps the plain Koekrad theme.
+      assert.ok(!(await channel.stored())!.includes("taart"));
+      const cookieIdle = ((await status(requester)) as { status: { variant: string; round?: object; roundsLeft: number } }).status;
+      assert.equal(cookieIdle.round, undefined);
+      assert.equal(cookieIdle.variant, "cookie");
+      assert.equal(cookieIdle.roundsLeft, 21);
 
       // Forged, stale or unknown slash commands do nothing.
       const count = posts.length;
