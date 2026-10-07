@@ -23,6 +23,7 @@ export const reviewLabels: Record<
     "Bergbronkwaliteit",
     "Gemeentepils van topkwaliteit",
   ],
+  cookie: ["Oud en zacht", "Droog kruimeltje", "Prima traktatie", "Smullen geblazen", "Banketbakkersniveau"],
 };
 
 export interface ReviewSettings {

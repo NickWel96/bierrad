@@ -31,6 +31,8 @@ export interface DrawInstruction {
 }
 export interface BeerWheelSession {
   readonly variant?: WheelVariant;
+  /** Koekrad rounds only: the round's word, display only. */
+  readonly title?: string;
   readonly id: string;
   readonly participants: readonly Participant[];
   readonly winnerCount: number;

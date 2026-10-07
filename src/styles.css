@@ -1057,6 +1057,28 @@ footer b {
   --drawer-bg: #f7fcfd;
   --strip-bg: #d9eef3;
 }
+:root[data-variant="cookie"] {
+  --text: #3f2a1c;
+  --bg: #fbf2e4;
+  --primary: #a95a2a;
+  --primary-hover: #bb6a37;
+  --primary-text: #fff8ec;
+  --primary-edge: #874520;
+  --primary-shadow: #683418;
+  --primary-depth: 5px;
+  --badge-bg: #f2dfc2;
+  --badge-border: #e3c69d;
+  --hub-bg: #fff6e8;
+  --switch-current: #a95a2a;
+  --final-bg: #f4e2c7;
+  --final-border: #d6a571;
+  --count-bg: #f2dfc2;
+  --stepper-bg: #f2dfc2;
+  --reveal-bg: #dba872;
+  --reveal-text: #3f2a1c;
+  --drawer-bg: #fff8ec;
+  --strip-bg: #f2dfc2;
+}
 /* Dark schemes: warm and dim, never cold black. Wheel segments keep their colours. */
 :root[data-theme="dark"] {
   color-scheme: dark;
@@ -1199,6 +1221,37 @@ footer b {
   --strip-bg: #1a2f37;
   --wheel-rim: #081216;
   --wheel-face: #172a32;
+}
+:root[data-theme="dark"][data-variant="cookie"] {
+  --bg: #1d150f;
+  --text: #f4e6d4;
+  --ink: #f4e6d4;
+  --on-ink: #1d150f;
+  --surface: #261c14;
+  --surface-raised: #2a1f16;
+  --surface-soft: #30241a;
+  --tint: #31251b;
+  --border: #423224;
+  --border-mid: #53402e;
+  --primary: #df9a5c;
+  --primary-hover: #eaab70;
+  --primary-text: #21150c;
+  --primary-edge: #9c5f30;
+  --primary-shadow: #6b3f1e;
+  --primary-depth: 5px;
+  --badge-bg: #31241a;
+  --badge-border: #4e3a29;
+  --hub-bg: #2c2017;
+  --switch-current: #df9a5c;
+  --final-bg: #2c2017;
+  --final-border: #77532f;
+  --count-bg: #36281c;
+  --stepper-bg: #36281c;
+  --reveal-bg: #dba872;
+  --reveal-text: #2b1a0e;
+  --drawer-bg: #261c14;
+  --strip-bg: #31251b;
+  --wheel-face: #2c2017;
 }
 /* Until the script sets data-theme, follow the system so dark screens never flash. */
 @media (prefers-color-scheme: dark) {

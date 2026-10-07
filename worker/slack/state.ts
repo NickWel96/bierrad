@@ -1,4 +1,4 @@
-import { reactionVariant, themes } from "../../shared/variant";
+import { reactionVariant, themeFor, themes } from "../../shared/variant";
 import type { CallOutcome } from "../channel/messages";
 import { createSession } from "../../src/domain/drawEngine";
 import type { WheelVariant } from "../../shared/variant";
@@ -33,6 +33,8 @@ export interface SlackJob {
   mentionIds?: (string | null)[];
   /** Host-started sessions with reviews: the invitation under the winners. */
   review?: { until: number; link: string };
+  /** Koekrad rounds only: the round's validated word. */
+  title?: string;
   status: "pending" | "posting" | "posted" | "failed" | "uncertain";
   readyAt: number;
   attemptedAt?: number;
@@ -134,6 +136,7 @@ export function queueResult(record: StoredSession) {
         record.session.participants.find((p) => p.id === spin.winnerId)!.name,
     ),
     mentionIds: draw.spins.map((spin) => identities.get(spin.winnerId) ?? null),
+    ...(record.title ? { title: record.title } : {}),
     status: "pending",
     readyAt: Math.max(
       ...draw.spins.map((s) => Date.parse(s.startAt) + s.durationMs),
@@ -168,7 +171,7 @@ export function queueChannelNotice(
   };
 }
 export function resultBody(job: SlackJob) {
-  const theme = themes[reactionVariant(job.source.reactionName)];
+  const theme = themeFor(reactionVariant(job.source.reactionName), job.title);
   const heading = `${theme.icon} Het rad heeft gesproken!\n`;
   const ending = `${job.names.length === 1 ? "Jij mag" : "Jullie mogen"} ${theme.drink} halen!`;
   const invitation = job.review

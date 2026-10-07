@@ -3,11 +3,12 @@ import {
   channelVariants,
   type ChannelVariant,
 } from "../../shared/channel";
-import { themes } from "../../shared/variant";
+import { roundTitle, themes } from "../../shared/variant";
 import { equalHash, hashSecret } from "../auth";
 /**
- * `/koffierad` and `/waterrad` slash commands. Both belong to the Koffierad
- * app: Slack signs every request with its signing secret, the only authorization.
+ * `/koffierad`, `/waterrad` and `/koekrad` slash commands. All belong to the
+ * Koffierad app: Slack signs every request with its signing secret, the only
+ * authorization.
  * https://docs.slack.dev/authentication/verifying-requests-from-slack/
  */
 function commandVariant(command: string | undefined): ChannelVariant | undefined {
@@ -101,6 +102,8 @@ export type SlashRequest =
       minutes?: number;
       /** Signed by Slack like everything else; only shown, never authorizes. */
       channelName?: string;
+      /** `/koekrad <titel>` only, validated by `roundTitle`; only shown. */
+      title?: string;
     };
 /** Slack channel names: lowercase letters, digits, `-`, `_` and `.`, at most 80. */
 export function validChannelName(name: string | undefined): string | undefined {
@@ -140,10 +143,16 @@ export function parseSlashCommand(body: string): SlashRequest {
     ...(channelName ? { channelName } : {}),
   } as const;
   if (!text) return round;
-  const match = /^(\d{1,2})\s*(m|min|minuut|minuten)?$/i.exec(text);
-  return match
-    ? { ...round, minutes: Number(match[1]) }
-    : { kind: "help", variant };
+  // Minutes come last; only the Koekrad takes one word before them.
+  const match = /(?:^|\s+)(\d{1,2})\s*(m|min|minuut|minuten)?$/i.exec(text);
+  const rest = match ? text.slice(0, match.index) : text;
+  const title = variant === "cookie" && rest ? roundTitle(rest) : undefined;
+  if (rest && !title) return { kind: "help", variant };
+  return {
+    ...round,
+    ...(match ? { minutes: Number(match[1]) } : {}),
+    ...(title ? { title } : {}),
+  };
 }
 /** Only the person who typed the command sees this reply. */
 export function ephemeral(text: string): Response {
@@ -159,5 +168,7 @@ export function ephemeral(text: string): Response {
 }
 export function slashHelp(variant: ChannelVariant): string {
   const { command, round } = channelCopy[variant];
-  return `${themes[variant].icon} Gebruik \`${command}\` om een ${round} te starten met de standaardwachttijd van dit kanaal, of \`${command} 10\` om het rad na 1 tot 30 minuten te laten draaien.`;
+  return variant === "cookie"
+    ? `${themes[variant].icon} Gebruik \`${command}\` om een ${round} te starten met de standaardwachttijd van dit kanaal, of bijvoorbeeld \`${command} taart 10\` voor een taartronde na 1 tot 30 minuten. De titel is één woord van 2 tot 20 letters.`
+    : `${themes[variant].icon} Gebruik \`${command}\` om een ${round} te starten met de standaardwachttijd van dit kanaal, of \`${command} 10\` om het rad na 1 tot 30 minuten te laten draaien.`;
 }

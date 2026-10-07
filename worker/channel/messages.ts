@@ -1,5 +1,5 @@
-import { channelCopy, type ChannelVariant } from "../../shared/channel";
-import { themes } from "../../shared/variant";
+import { roundCopy, type ChannelVariant } from "../../shared/channel";
+import { themeFor } from "../../shared/variant";
 import { slackRating, type RatingEmoji } from "../slack/rating";
 import { clock } from "../slack/state";
 
@@ -38,6 +38,8 @@ const options = {
 /**
  * Fixed Koffierad channel messages. Only server-built links and times; no
  * names, mentions or client-supplied text. Never unfurled or broadcast.
+ * (Round cards below may carry a Koekrad word, which `roundTitle` limits to
+ * letters and hyphens and which only ever appears in literal text elements.)
  */
 function body(channelId: string, elements: Element[]) {
   return {
@@ -61,9 +63,10 @@ function card(
   startAt: number,
   status: Element[],
   context?: string,
+  title?: string,
 ) {
-  const theme = themes[variant],
-    round = channelCopy[variant].round;
+  const theme = themeFor(variant, title),
+    round = roundCopy(variant, title).round;
   const elements: Element[] = [
     {
       type: "text",
@@ -99,8 +102,10 @@ export function callBody(
   variant: ChannelVariant = "coffee",
   /** With reviews the link opens the channel page, where people can log in. */
   linkText = "Kijk live mee",
+  /** Koekrad only: the round's validated word. */
+  title?: string,
 ) {
-  const theme = themes[variant];
+  const theme = themeFor(variant, title);
   const { elements, blocks } = card(
     variant,
     startAt,
@@ -112,6 +117,7 @@ export function callBody(
       { type: "link", url: spectatorLink, text: linkText },
     ],
     `Het ${theme.name} kiest één ${theme.drink}haler.`,
+    title,
   );
   return { channel: channelId, text: fallback(elements), blocks, ...options };
 }
@@ -147,9 +153,11 @@ export function settledCallBody(
   outcome: CallOutcome,
   /** The channel link, only while the round can still be reviewed. */
   reviewLink?: string,
+  /** Koekrad only: the round's validated word. */
+  title?: string,
 ) {
-  const theme = themes[variant],
-    copy = channelCopy[variant];
+  const theme = themeFor(variant, title),
+    copy = roundCopy(variant, title);
   let status: Element[];
   let context: string | undefined;
   let names: string[] = [];
@@ -211,7 +219,7 @@ export function settledCallBody(
             : `Het ${theme.name} kon de reacties niet lezen, dus er is niet gedraaid. Vraag gerust een nieuwe ronde aan.`,
       },
     ];
-  const { elements, blocks } = card(variant, startAt, status, context);
+  const { elements, blocks } = card(variant, startAt, status, context, title);
   return {
     channel: channelId,
     ts,
@@ -307,7 +315,7 @@ export function boundBody(channelId: string, requestLink: string) {
     },
     {
       type: "text",
-      text: ": daar zie je steeds de huidige ronde. Een nieuwe ronde start je door hier /koffierad of /waterrad te typen (met bijvoorbeeld 10 erachter voor tien minuten). Meedoen doe je door op ☕ of 💧 te klikken onder de oproep. Eerdere links van dit kanaal werken niet meer.",
+      text: ": daar zie je steeds de huidige ronde. Een nieuwe ronde start je door hier /koffierad, /waterrad of /koekrad te typen (met bijvoorbeeld 10 erachter voor tien minuten, of /koekrad taart 10 voor een taartronde). Meedoen doe je door op ☕, 💧 of 🍪 te klikken onder de oproep. Eerdere links van dit kanaal werken niet meer.",
     },
   ]);
 }

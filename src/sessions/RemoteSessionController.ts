@@ -159,6 +159,7 @@ export class RemoteSessionController implements SessionController {
       id: "live",
       mode: "manual",
       variant: dto.variant ?? "beer",
+      ...(dto.title ? { title: dto.title } : {}),
       participants: dto.participants,
       winnerCount: dto.winnerCount,
       state: dto.state,
@@ -221,7 +222,11 @@ export class RemoteSessionController implements SessionController {
     this.options.capability = "";
     this.publish(
       "unavailable",
-      { ...empty(), variant: this.snapshot.session.variant },
+      {
+        ...empty(),
+        variant: this.snapshot.session.variant,
+        title: this.snapshot.session.title,
+      },
       "Dit rad is afgelopen of niet beschikbaar.",
     );
   }

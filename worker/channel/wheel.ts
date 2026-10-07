@@ -1,16 +1,16 @@
 import { DurableObject } from "cloudflare:workers";
 import {
   CHANNEL_IDLE_TTL_MS,
-  channelCopy,
   DEFAULT_ROUND_MINUTES,
   MAX_ROUNDS_PER_DAY,
+  roundCopy,
   roundStartAt,
   validRoundMinutes,
   type ChannelCommandResult,
   type ChannelStatus,
   type ChannelVariant,
 } from "../../shared/channel";
-import { themes } from "../../shared/variant";
+import { roundTitle, themes } from "../../shared/variant";
 import {
   DEFAULT_REVIEW_SETTINGS,
   MAX_MEMBERS,
@@ -47,6 +47,8 @@ interface Round {
   id: string;
   /** Absent on rounds from before water; those are coffee. */
   variant?: ChannelVariant;
+  /** Koekrad only: the validated word from `/koekrad <titel>`; display only. */
+  title?: string;
   status: "posting" | "open";
   startAt: number;
   endsAt: number;
@@ -84,7 +86,7 @@ interface Binding {
    * on another screen. Absent on bindings made before it; rotation adds one.
    */
   viewerCapability?: string;
-  /** Last channel name Slack sent with a signed `/koffierad` or `/waterrad`; display only. */
+  /** Last channel name Slack sent with a signed slash command; display only. */
   channelName?: string;
   /** What the latest round fetched, so an idle screen keeps its theme. */
   lastVariant?: ChannelVariant;
@@ -132,18 +134,19 @@ export async function channelViewerLocator(words: string): Promise<string> {
   return (await hashSecret(`koffierad-viewer:${words}`)).slice(0, 32);
 }
 /**
- * Ephemeral replies for a refused `/koffierad` or `/waterrad`. A busy channel
- * names the round that is running, which may be of the other kind.
+ * Ephemeral replies for a refused slash command. A busy channel names the
+ * round that is running, which may be of another kind.
  */
 function roundError(
   code: string,
   requested: ChannelVariant,
   running: ChannelVariant,
+  runningTitle?: string,
 ): string | undefined {
   const icon = themes[requested].icon;
   switch (code) {
     case "round_active":
-      return `${themes[running].icon} Er loopt al een ${channelCopy[running].round} in dit kanaal. Klik op ${themes[running].icon} onder de oproep om mee te doen.`;
+      return `${themes[running].icon} Er loopt al een ${roundCopy(running, runningTitle).round} in dit kanaal. Klik op ${themes[running].icon} onder de oproep om mee te doen.`;
     case "round_limit":
       return `${icon} Vandaag zijn er al genoeg rondes gestart in dit kanaal. Morgen weer!`;
     case "slack_post_failed":
@@ -354,6 +357,7 @@ export class ChannelWheel extends DurableObject<Env & SlackSecrets> {
               // A settled round stays visible (its result) but no longer blocks.
               active: round.id !== settledId,
               ...(round.reviews ? { reviews: true } : {}),
+              ...(round.title ? { title: round.title } : {}),
             },
           }
         : {}),
@@ -483,7 +487,7 @@ export class ChannelWheel extends DurableObject<Env & SlackSecrets> {
         return json({ type: "status", status } satisfies ChannelCommandResult);
       };
       if (command === null) return await reply();
-      // No round requests: rounds start only from a signed /koffierad or /waterrad.
+      // No round requests: rounds start only from a signed slash command.
       const allowed: Record<string, string[]> = {
         setDefaultMinutes: ["minutes"],
         setReviews: ["enabled", "minutes"],
@@ -592,6 +596,7 @@ export class ChannelWheel extends DurableObject<Env & SlackSecrets> {
     minutes: number | undefined,
     channelName?: string,
     variant: ChannelVariant = "coffee",
+    title?: string,
   ): Promise<string | null> {
     const app = frontend(this.env);
     const binding = this.read();
@@ -607,15 +612,17 @@ export class ChannelWheel extends DurableObject<Env & SlackSecrets> {
     const chosen = minutes ?? binding.defaultMinutes;
     if (!validRoundMinutes(chosen)) return slashHelp(variant);
     try {
-      await this.startRound(chosen, variant);
+      await this.startRound(chosen, variant, title);
       return null;
     } catch (error) {
+      const running = this.read()?.round;
       return (
         (error instanceof RequestError &&
           roundError(
             error.code,
             variant,
-            this.read()?.round?.variant ?? "coffee",
+            running?.variant ?? "coffee",
+            running?.title,
           )) ||
         `${icon} Het Koffierad is nu niet bereikbaar. Probeer het zo opnieuw.`
       );
@@ -628,8 +635,11 @@ export class ChannelWheel extends DurableObject<Env & SlackSecrets> {
   private async startRound(
     minutes: number,
     variant: ChannelVariant,
+    rawTitle?: string,
   ): Promise<{ startAt: string; spectatorCapability: string }> {
     const reaction = themes[variant].reaction;
+    // Validated again here: only a Koekrad round carries a word.
+    const title = variant === "cookie" ? roundTitle(rawTitle) : undefined;
     const spectator = randomWords();
     const [sessionLocator, spectatorHash] = await Promise.all([
       wordLocator(spectator),
@@ -665,6 +675,7 @@ export class ChannelWheel extends DurableObject<Env & SlackSecrets> {
     binding.round = {
       id,
       variant,
+      ...(title ? { title } : {}),
       status: "posting",
       startAt,
       endsAt: startAt + ROUND_WATCH_MS,
@@ -710,6 +721,7 @@ export class ChannelWheel extends DurableObject<Env & SlackSecrets> {
         startAt,
         variant,
         reviewed ? "Open de ronde" : undefined,
+        title,
       ),
     );
     if (posted.status !== "posted") {
@@ -746,6 +758,7 @@ export class ChannelWheel extends DurableObject<Env & SlackSecrets> {
               link: channelPage,
             }
           : undefined,
+        title,
       );
     } catch {
       clear();

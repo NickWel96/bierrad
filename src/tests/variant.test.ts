@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import App from "../App";
-import { VariantContext } from "../Theme";
+import { RoundTitleContext, VariantContext } from "../Theme";
 import { ManualParticipantSource } from "../services/ManualParticipantSource";
 import { LocalWinnerCountPreference } from "../services/WinnerCountPreference";
 import { loadWeights, saveWeights } from "../services/RigPreference";
@@ -157,6 +157,50 @@ test("water setup, finale and Slack controls say water halen and count only :dro
   );
   assert.match(slack, /:droplet:/);
   assert.doesNotMatch(slack, /:beers:|:coffee:/);
+  controller.dispose();
+});
+test("a Koekrad round takes its word: titles are one plain word, never markup", async () => {
+  const { roundTitle, themeFor, themes, standaloneVariants } = await import("../../shared/variant");
+  const { roundCopy } = await import("../../shared/channel");
+  assert.equal(themes.cookie.name, "Koekrad");
+  assert.equal(themes.cookie.reaction, "cookie");
+  assert.equal(themes.cookie.slackApp, "coffee");
+  assert.ok(!(standaloneVariants as readonly string[]).includes("cookie"));
+  assert.equal(themeFor("cookie", "taart").name, "Taartrad");
+  assert.equal(themeFor("cookie", "Bitterballen").name, "Bitterballenrad");
+  assert.equal(themeFor("cookie", "ijs").name, "IJsrad");
+  assert.equal(themeFor("cookie", "appel-taart").finale, "DE APPEL-TAARTBRIGADE VAN DEZE RONDE");
+  assert.equal(themeFor("cookie", "taart").resultOne, "mag de taart halen.");
+  assert.equal(roundCopy("cookie", "taart").round, "taartronde");
+  assert.equal(roundCopy("cookie").round, "koekronde");
+  // Only the Koekrad takes a word, and only a valid one.
+  assert.equal(themeFor("coffee", "taart"), themes.coffee);
+  assert.equal(roundCopy("water", "taart").round, "waterronde");
+  assert.equal(themeFor("cookie", "<b>x</b>"), themes.cookie);
+  assert.equal(roundTitle("Crème"), "crème");
+  for (const bad of [undefined, 5, "", "a", "a".repeat(21), "twee woorden", "koek1", "@here", ":cookie:", "-koek", "koek--x", "koek\u200b"])
+    assert.equal(roundTitle(bad), undefined, String(bad));
+});
+test("a titled Koekrad round shows its word everywhere, as plain text", () => {
+  const controller = new LocalSessionController();
+  const render = (title?: string) =>
+    renderToStaticMarkup(
+      createElement(
+        VariantContext.Provider,
+        { value: "cookie" },
+        createElement(RoundTitleContext.Provider, { value: title }, createElement(App, { controller })),
+      ),
+    );
+  // The switcher always names the main wheels; everything else is the round's.
+  const taart = render("taart").replace(/<nav class="variant-switch".*?<\/nav>/s, "");
+  assert.match(taart, /Taartrad/);
+  assert.match(taart, /DRAAI HET TAARTRAD/);
+  assert.doesNotMatch(taart, /Koekrad|bier|koffie/i);
+  assert.match(render(), /Koekrad/);
+  // An invalid word never reaches the page.
+  const forged = render("<img src=x onerror=alert(1)>");
+  assert.match(forged, /Koekrad/);
+  assert.doesNotMatch(forged, /onerror|&lt;img/);
   controller.dispose();
 });
 test("water roster and count are stored apart from beer and coffee", () => {
