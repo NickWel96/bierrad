@@ -62,3 +62,16 @@ Requested by the owner: the channel was hard to read with a top-level call plus 
 - No new endpoint, secret, scope, capability, storage class or migration; nothing new is retained.
 
 Automated coverage: call and settled bodies (title, mention vs literal name with `<!channel>` escaped in the fallback, participant count, notices, no link), card queueing for drawn, empty and unreadable rounds but not for Bierrad sessions, the deadline for pending cards, and in the real Worker/SQLite suite a non-broadcast thread result plus exactly one `chat.update` of the stored call for coffee, and for water a rejected update that is retried once and then succeeds without further updates.
+
+## Water and Koffierad only through the channel — 2026-10-07
+
+Requested by the owner: the Waterrad leaves the overviews and is only reachable with `/waterrad` in a bound channel, leaving two main wheels (Bierrad and Koffierad, which hosts water rounds). Reviewed against every SECURITY.md section; the Waterrad paragraph records the restriction.
+
+- This only removes surface. A new allowlist `standaloneVariants` (`beer`, `coffee`) decides the switcher, local routes and `POST /api/sessions`; `startsWithSlack` (`beer` only, see below) decides the Slack login route on the frontend, `/auth/slack/<variant>`, the login cookie and join-link logins. `water` is refused at all of them; channel rounds still create water sessions internally, as before.
+- `/auth/slack/water` falls through to the existing "expired" redirect: no Slack redirect, only the clearing cookie.
+- Old `#/water` and `#/water-slack[/reason]` links are rewritten on the client to `#/coffee` with `history.replaceState`; the mapping is fixed and takes no input beyond the exact hash.
+- Existing water rounds, their spectator and word links, reviews and Slack texts are unchanged. Stored local `waterrad.*` rosters are no longer read but are not deleted.
+- In the same change, also requested by the owner: Sign in with Slack ("Start met Slack", linking a Friday message) starts only Bierrad sessions. `/auth/slack/coffee` gets the same refusal as water, plain and join login cookies accept only `beer`, join logins for non-beer sessions fail as expired, and the Koffierad live bar no longer offers Start met Slack. Old `#/coffee-slack[/reason]` links open the Koffierad. Channel binding and personal channel links keep using the Koffierad app unchanged.
+- No new endpoint, secret, scope, capability, storage, dependency or migration.
+
+Automated coverage: the switcher renders only Bierrad and Koffierad (also on a water-themed page), `#/water` is no local route and the retired routes map to coffee, and the real Worker suite refuses `variant: "water"` on session creation and gives `/auth/slack/coffee` and `/auth/slack/water` no Slack redirect or login cookie; plain coffee and water login cookies are refused. The Sign in with Slack suite now runs for beer only; coffee and water rounds stay covered by the channel suite.

@@ -1,4 +1,4 @@
-import { isWheelVariant, type WheelVariant } from "../../shared/variant";
+import { startsWithSlack, type WheelVariant } from "../../shared/variant";
 import { equalHash, randomHex } from "../auth";
 import { object, SlackApiClient, SlackError, type SlackObject } from "./api";
 import { loginConfigured, type SlackSecrets } from "./access";
@@ -41,7 +41,7 @@ export function parseLoginCookie(
   // Duplicates are ambiguous; fail closed.
   if (values.length !== 1) return;
   const match =
-    /^([a-z]+|channel-[CG][A-Z0-9]{8,20}|member-[a-f0-9]{32}|join-(?:beer|coffee|water)-[a-f0-9]{32})\.([a-f0-9]{64})\.([a-f0-9]{64})\.(\d{13})$/.exec(
+    /^([a-z]+|channel-[CG][A-Z0-9]{8,20}|member-[a-f0-9]{32}|join-beer-[a-f0-9]{32})\.([a-f0-9]{64})\.([a-f0-9]{64})\.(\d{13})$/.exec(
       values[0].slice(LOGIN_COOKIE.length + 1),
     );
   if (!match || Number(match[4]) <= now) return;
@@ -52,8 +52,10 @@ export function parseLoginCookie(
     ? match[1].slice(7)
     : undefined;
   const join = /^join-([a-z]+)-([a-f0-9]{32})$/.exec(match[1]);
-  if (!channel && !member && !join && !isWheelVariant(match[1])) return;
-  if (join && !isWheelVariant(join[1])) return;
+  // Channel bindings and personal channel links use the coffee app; a plain
+  // or join login only ever starts or joins a Bierrad.
+  if (!channel && !member && !join && !startsWithSlack(match[1])) return;
+  if (join && !startsWithSlack(join[1])) return;
   return {
     // Channel bindings and personal links are Koffierad features: the coffee
     // app. A session's personal link uses that session's own app.
