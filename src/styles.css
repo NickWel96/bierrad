@@ -70,6 +70,7 @@
   --shadow-card-lg: rgb(48 46 38 / 0.18);
   --backdrop: rgb(48 46 38 / 42%);
   --overlay: rgb(48 46 38 / 0.45);
+  color-scheme: light;
   font-family: "DM Sans", sans-serif;
   color: var(--text);
   background: var(--bg);
@@ -1056,6 +1057,157 @@ footer b {
   --drawer-bg: #f7fcfd;
   --strip-bg: #d9eef3;
 }
+/* Dark schemes: warm and dim, never cold black. Wheel segments keep their colours. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1b1813;
+  --text: #f1e9d8;
+  --text-muted: #b5ab97;
+  --text-soft: #c2b8a4;
+  --text-subtle: #a59b87;
+  --text-faint: #9a907c;
+  --accent-text: #c9b48a;
+  --accent-text-strong: #dcc89c;
+  --ink: #f1e9d8;
+  --on-ink: #1b1813;
+  --surface: #26221b;
+  --surface-raised: #2a251d;
+  --surface-soft: #2f2a21;
+  --surface-strong: #332d23;
+  --tint: #2f2a20;
+  --tint-warm: #3a3020;
+  --border: #3a3428;
+  --border-soft: #302a21;
+  --border-mid: #4a4233;
+  --border-strong: #5a4f3b;
+  --focus: #8fc4b2;
+  --primary: #f7b928;
+  --primary-hover: #ffcb4e;
+  --primary-text: #302e26;
+  --primary-edge: #a87a12;
+  --primary-shadow: #7a5a0e;
+  --primary-depth: 4px;
+  --badge-bg: transparent;
+  --badge-border: #3a3428;
+  --status: #8fb08f;
+  --switch-current: var(--ink);
+  --count-bg: #352f24;
+  --stepper-bg: var(--surface);
+  --drawer-bg: var(--surface);
+  --final-bg: transparent;
+  --final-border: #3a3428;
+  --hub-bg: #2a251d;
+  --empty-wheel-bg: #26221bef;
+  --countdown-bg: #26221bee;
+  --reveal-bg: #f8bd37;
+  --reveal-text: #412402;
+  --separator: #e0a93a;
+  --wheel-rim: #0e0c09;
+  --wheel-face: #2a251d;
+  --wheel-peg: #f8df95;
+  --live: #9cc79e;
+  --live-dot: #6fbf72;
+  --live-soft: #a3bfab;
+  --notice: #e7a07c;
+  --danger: #f2907f;
+  --warn-bg: #4a2e18;
+  --warn-text: #f5c9a0;
+  --success-bg: #1f3527;
+  --success-border: #3f6b4c;
+  --success-text: #a8d8b5;
+  --star-off: #4a4233;
+  --star-on: #f2b13a;
+  --shadow-wheel: #00000059;
+  --shadow-card: #0000;
+  --shadow-pop: #00000066;
+  --shadow-countdown: #00000080;
+  --shadow-hub: #0006;
+  --shadow-tab: #0004;
+  --shadow-dialog: rgb(0 0 0 / 50%);
+  --shadow-card-lg: rgb(0 0 0 / 40%);
+  --backdrop: rgb(0 0 0 / 60%);
+  --overlay: rgb(0 0 0 / 60%);
+}
+:root[data-theme="dark"][data-variant="coffee"] {
+  --bg: #1c1512;
+  --text: #f2e4d6;
+  --ink: #f2e4d6;
+  --on-ink: #1c1512;
+  --surface: #241b16;
+  --surface-raised: #281e18;
+  --surface-soft: #2d221b;
+  --tint: #2e231d;
+  --border: #3d2f27;
+  --border-mid: #4d3b30;
+  --primary: #c48a5c;
+  --primary-hover: #d39b6d;
+  --primary-text: #1e140f;
+  --primary-edge: #8a5a38;
+  --primary-shadow: #5e3b24;
+  --primary-depth: 5px;
+  --badge-bg: #2e221c;
+  --badge-border: #4a382d;
+  --hub-bg: #2a1f19;
+  --switch-current: #c48a5c;
+  --final-bg: #2a1f19;
+  --final-border: #6e4e38;
+  --count-bg: #33261f;
+  --stepper-bg: #33261f;
+  --reveal-bg: #d7a575;
+  --reveal-text: #2a1a12;
+  --drawer-bg: #241b16;
+  --wheel-face: #2a1f19;
+}
+:root[data-theme="dark"][data-variant="water"] {
+  --bg: #0f1c22;
+  --text: #e2f1f5;
+  --text-muted: #9fb8c0;
+  --text-soft: #aec5cc;
+  --text-subtle: #8eaab3;
+  --text-faint: #7a959e;
+  --accent-text: #8fc3d2;
+  --accent-text-strong: #b5dce6;
+  --ink: #e2f1f5;
+  --on-ink: #0f1c22;
+  --surface: #15262d;
+  --surface-raised: #172a32;
+  --surface-soft: #1a2e36;
+  --surface-strong: #1d333c;
+  --tint: #1a2f37;
+  --tint-warm: #1d3540;
+  --border: #26404a;
+  --border-soft: #1d333c;
+  --border-mid: #2f4d58;
+  --border-strong: #3a5d6a;
+  --primary: #4fb3d1;
+  --primary-hover: #6cc3dd;
+  --primary-text: #0b1a20;
+  --primary-edge: #2a7d96;
+  --primary-shadow: #1b5a6d;
+  --primary-depth: 5px;
+  --badge-bg: #183039;
+  --badge-border: #2a4a55;
+  --hub-bg: #172a32;
+  --switch-current: #4fb3d1;
+  --final-bg: #15303a;
+  --final-border: #2f6577;
+  --count-bg: #1c3640;
+  --stepper-bg: #1c3640;
+  --reveal-bg: #7cc6d9;
+  --reveal-text: #0f2a33;
+  --drawer-bg: #15262d;
+  --strip-bg: #1a2f37;
+  --wheel-rim: #081216;
+  --wheel-face: #172a32;
+}
+/* Until the script sets data-theme, follow the system so dark screens never flash. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    color: #f1e9d8;
+    background: #1b1813;
+  }
+}
 
 .schedule-controls {
   margin-top: 16px;
@@ -1757,4 +1909,47 @@ details.member-hint summary::-webkit-details-marker {
   border-radius: 8px;
   background: var(--surface);
   font: inherit;
+}
+
+/* Shortcut hint: small and quiet in the corner, like a presenter cheat line. */
+body {
+  padding-bottom: 32px;
+}
+.shortcut-hint {
+  position: fixed;
+  right: 12px;
+  bottom: 8px;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  font:
+    500 11px ui-monospace,
+    "SFMono-Regular",
+    Consolas,
+    monospace;
+  color: var(--text-faint);
+  opacity: 0.75;
+  transition: opacity 0.2s;
+}
+.shortcut-hint:hover,
+.shortcut-hint:focus-within {
+  opacity: 1;
+}
+.shortcut-hint button {
+  border: 0;
+  padding: 2px 4px;
+  background: none;
+  font: inherit;
+  color: inherit;
+}
+.shortcut-hint button[aria-pressed="true"] {
+  color: var(--text);
+}
+.shortcut-hint kbd {
+  font: inherit;
+  font-weight: 700;
 }
