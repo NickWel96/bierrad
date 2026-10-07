@@ -50,8 +50,8 @@ export function BeerWheel({
         role="img"
         aria-label={`${theme.name} met ${people.length} deelnemers`}
       >
-        <circle cx="210" cy="210" r="209" fill="#292820" />
-        <circle cx="210" cy="210" r="201" fill="#fff8e9" />
+        <circle className="wheel-rim" cx="210" cy="210" r="209" />
+        <circle className="wheel-face" cx="210" cy="210" r="201" />
         {displayed.map((p, i) => {
           const a = point(i * step),
             b = point((i + 1) * step);
@@ -62,8 +62,8 @@ export function BeerWheel({
               ) : (
                 <path
                   d={`M 210 210 L ${a.join(" ")} A 194 194 0 ${step > 180 ? 1 : 0} 1 ${b.join(" ")} Z`}
+                  className="wheel-segment"
                   fill={palette[i % palette.length]}
-                  stroke="#fff8e9"
                   strokeWidth="2"
                 />
               )}
@@ -78,7 +78,7 @@ export function BeerWheel({
                   textLength={p.name.length > 13 ? 132 : undefined}
                   lengthAdjust="spacingAndGlyphs"
                   textAnchor="middle"
-                  fill="#292820"
+                  className="wheel-name"
                   fontSize={people.length > 24 ? 14 : 19}
                   fontWeight="750"
                 >
@@ -91,7 +91,7 @@ export function BeerWheel({
         })}
         {Array.from({ length: RIM_PEGS }, (_, i) => {
           const [x, y] = point((i * 360) / RIM_PEGS, 204);
-          return <circle key={i} cx={x} cy={y} r="2" fill="#f8df95" />;
+          return <circle key={i} className="wheel-peg" cx={x} cy={y} r="2" />;
         })}
       </svg>
       <div className="wheel-hub" aria-hidden="true">
