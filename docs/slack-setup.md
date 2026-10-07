@@ -17,7 +17,7 @@ Plak het token alleen in de interactieve geheime invoer. Nooit in chat, commando
 
 ## Inloggen met Slack voor organisatoren
 
-Iedereen kan een gewone live-sessie maken; dat geeft **geen** Slack-toegang. Een Slack-sessie start je met **Start met Slack** in de livebalk (of via `#/slack`, koffie: `#/coffee-slack`). Je logt in met Slack (OpenID Connect, authorization code flow). De Worker laat alleen **volwaardige leden van de workspace van de bot** een Slack-rad starten: geen gasten (`is_restricted`/`is_ultra_restricted`), externe Slack Connect-gebruikers, bots, apps of verwijderde accounts. Iedereen mag wel blijven meedoen als deelnemer en meekijken via de kijklink.
+Iedereen kan een gewone live-sessie maken; dat geeft **geen** Slack-toegang. Een Slack-sessie start je met **Start met Slack** in de livebalk van het Bierrad (of via `#/slack`). Het Koffierad heeft geen Start met Slack; dat gaat alleen via een [gekoppeld kanaal](#koffierad-aan-een-kanaal-koppelen). Je logt in met Slack (OpenID Connect, authorization code flow). De Worker laat alleen **volwaardige leden van de workspace van de bot** een Slack-rad starten: geen gasten (`is_restricted`/`is_ultra_restricted`), externe Slack Connect-gebruikers, bots, apps of verwijderde accounts. Iedereen mag wel blijven meedoen als deelnemer en meekijken via de kijklink.
 
 Eenmalig instellen per app (Slack-appinstellingen → **OAuth & Permissions** en **Basic Information**):
 
@@ -83,7 +83,7 @@ PNG opnieuw exporteren zonder projectdependency: `npx --yes --registry=https://r
 
 Maak een **nieuwe** app From a manifest met [slack-coffee-app-manifest.json](slack-coffee-app-manifest.json), installeer haar in de gewenste workspace en nodig de Koffierad-bot uit in het koffiekanaal. De bestaande Bierrad-app blijft bestaan. Upload [coffee-icon.png](../public/coffee-icon.png) (1024 × 1024) bij Basic Information → Display Information → App icon. De vectorbron is [coffee-icon.svg](../public/coffee-icon.svg).
 
-De scopes zijn dezelfde minimale scopes als bij bier: bot `reactions:read`, `users:read`, `chat:write` en user `openid`, plus `reactions:write` en `commands` voor het [kanaal-Koffierad](#koffierad-aan-een-kanaal-koppelen). Het slashcommando `/koffierad` is het enige inkomende Slack-verzoek en vereist het signing secret; er zijn geen events of webhooks. Organisatoren loggen in met **Start met Slack** op het Koffierad en collega's reageren met **☕ `:coffee:`** op het gekozen bericht.
+De scopes zijn dezelfde minimale scopes als bij bier: bot `reactions:read`, `users:read`, `chat:write` en user `openid`, plus `reactions:write` en `commands` voor het [kanaal-Koffierad](#koffierad-aan-een-kanaal-koppelen). Het slashcommando `/koffierad` is het enige inkomende Slack-verzoek en vereist het signing secret; er zijn geen events of webhooks. Rondes starten met `/koffierad` in een [gekoppeld kanaal](#koffierad-aan-een-kanaal-koppelen) en collega's reageren met **☕ `:coffee:`** op de oproep van de bot; **Start met Slack** bestaat alleen voor het Bierrad.
 
 Bewaar het **nieuwe** bot-token interactief, uitsluitend in het volgende Worker-secret:
 
@@ -93,7 +93,7 @@ npx wrangler secret put COFFEE_SLACK_CLIENT_ID --env=""
 npx wrangler secret put COFFEE_SLACK_CLIENT_SECRET --env=""
 ```
 
-Voeg in de Koffierad-app dezelfde redirect-URL en user scope `openid` toe. Koffie-inloggen gebruikt uitsluitend de Koffierad-app en haar bot; Bierrad-inloggen uitsluitend de Bierrad-app. Intrekken werkt per app: verwijderen van `COFFEE_SLACK_CLIENT_SECRET` schakelt nieuwe koffie-starts, imports en posts uit, zonder bier te veranderen. Reeds geïmporteerde deelnemers volgen de bestaande sessie-TTL.
+Voeg in de Koffierad-app dezelfde redirect-URL en user scope `openid` toe. Koffie-inloggen gebruikt uitsluitend de Koffierad-app en haar bot; Bierrad-inloggen uitsluitend de Bierrad-app. Intrekken werkt per app: verwijderen van `COFFEE_SLACK_CLIENT_SECRET` schakelt koppelen, kanaalrondes en posts uit, zonder bier te veranderen. Reeds geïmporteerde deelnemers volgen de bestaande sessie-TTL.
 
 De server selecteert de bot en reactie uit de onveranderlijke sessievariant; er is geen fallback naar de bierbot als koffie niet is ingesteld. De variant ligt vast in de inlogcookie en kan tijdens de callback niet wisselen. Het hoofdbericht mag beide reacties bevatten; iedere variant leest uitsluitend zijn eigen reactie. Refresh en officiële @vermeldingen blijven gelijk werken.
 
@@ -101,7 +101,7 @@ Publicatievolgorde: eerst de compatibele Worker, vervolgens de frontend; configu
 
 ### Waterrad
 
-Het Waterrad gebruikt **dezelfde Koffierad-app** en dezelfde `COFFEE_SLACK_*`-secrets; er is geen aparte app en er zijn geen extra scopes of secrets nodig. **Start met Slack** op het Waterrad (of `#/water-slack`) logt in via de Koffierad-app. Collega's reageren met **💧 `:droplet:`**; ☕ en 🍻 tellen daar nooit mee, en omgekeerd telt 💧 nooit mee voor koffie of bier. De uitslag komt van de Koffierad-bot, met watertekst. Verwijderen van de koffiesecrets schakelt dus ook water uit. Upload eventueel [water-icon.png](../public/water-icon.png) (1024 × 1024, vectorbron [water-icon.svg](../public/water-icon.svg)) als je de app een algemener icoon wilt geven; dat is niet nodig.
+Het Waterrad gebruikt **dezelfde Koffierad-app** en dezelfde `COFFEE_SLACK_*`-secrets; er is geen aparte app en er zijn geen extra scopes of secrets nodig. Het bestaat alleen als ronde van een gekoppeld kanaal via `/waterrad` (zie [waterrondes toevoegen](#waterrondes-toevoegen-waterrad)); er is geen **Start met Slack** voor water. Collega's reageren met **💧 `:droplet:`**; ☕ en 🍻 tellen daar nooit mee, en omgekeerd telt 💧 nooit mee voor koffie of bier. De uitslag komt van de Koffierad-bot, met watertekst. Verwijderen van de koffiesecrets schakelt dus ook water uit. Upload eventueel [water-icon.png](../public/water-icon.png) (1024 × 1024, vectorbron [water-icon.svg](../public/water-icon.svg)) als je de app een algemener icoon wilt geven; dat is niet nodig.
 
 ## Steremoji's voor beoordelingen
 

@@ -83,17 +83,45 @@ test("coffee setup, finale and Slack controls consistently say coffee halen", as
   controller.dispose();
 });
 test("local routes, reactions and Slack apps come from one theme table", async () => {
-  const { localHash, localVariant, reactionVariant, themes, wheelVariants } =
-    await import("../../shared/variant");
+  const {
+    localHash,
+    localVariant,
+    reactionVariant,
+    retiredRoute,
+    standaloneVariants,
+    themes,
+    wheelVariants,
+  } = await import("../../shared/variant");
   assert.equal(localVariant(""), "beer");
-  for (const variant of wheelVariants) {
+  assert.deepEqual(standaloneVariants, ["beer", "coffee"]);
+  for (const variant of standaloneVariants)
     assert.equal(localVariant(localHash(variant)), variant);
+  for (const variant of wheelVariants)
     assert.equal(reactionVariant(themes[variant].reaction), variant);
-  }
-  for (const hash of ["#/slack", "#/live/x", "#/koffie-koppelen", "#/Coffee", "#/beer/"])
+  // Water is only a channel round: no own local wheel.
+  for (const hash of ["#/water", "#/slack", "#/live/x", "#/koffie-koppelen", "#/Coffee", "#/beer/"])
     assert.equal(localVariant(hash), undefined, hash);
+  // Saved water links open the Koffierad instead.
+  assert.equal(retiredRoute("#/water"), "#/coffee");
+  // Old Slack starts of water and coffee too: only the Bierrad starts with Slack.
+  for (const hash of ["#/water-slack", "#/water-slack/denied", "#/coffee-slack", "#/coffee-slack/busy"])
+    assert.equal(retiredRoute(hash), "#/coffee", hash);
+  for (const hash of ["", "#/coffee", "#/slack", "#/water/", "#/waterrad", "#/koffie/x"])
+    assert.equal(retiredRoute(hash), undefined, hash);
   assert.equal(themes.beer.slackApp, "beer");
   assert.equal(themes.coffee.slackApp, "coffee");
+});
+test("the switcher offers only the Bierrad and Koffierad", async () => {
+  const controller = new LocalSessionController();
+  for (const variant of ["beer", "coffee", "water"] as const) {
+    const page = renderToStaticMarkup(
+      createElement(VariantContext.Provider, { value: variant }, createElement(App, { controller })),
+    );
+    const nav = /<nav class="variant-switch"[^>]*>(.*?)<\/nav>/s.exec(page)?.[1] ?? "";
+    assert.deepEqual([...nav.matchAll(/href="([^"]+)"/g)].map((m) => m[1]), ["#/beer", "#/coffee"], variant);
+    assert.doesNotMatch(nav, /Waterrad|💧/);
+  }
+  controller.dispose();
 });
 test("water setup, finale and Slack controls say water halen and count only :droplet:", async () => {
   const controller = new LocalSessionController();

@@ -193,13 +193,13 @@ SessionController → Draw Engine → DrawInstruction → Wheel Renderers
                   officiële uitslag → oorspronkelijke Slack-thread
 ```
 
-`worker/slack` bevat de getypeerde client, parser, deelnemersbron, private mapping en resultaattekst. `worker/slack/login.ts` doet de inlogflow via `GET /auth/slack/<beer|coffee|water>` en `GET /auth/slack/callback`; hostcommando's zijn `slackImport` (optioneel permalink, zonder link = refresh), `slackManual`, `slackRetry`. Ook gemanipuleerde spectatorrequests worden afgewezen. Spectator-DTO's bevatten geen Slack-metadata. De raderen/selectie zijn ongewijzigd en blijven zonder netwerk of Slack functioneren.
+`worker/slack` bevat de getypeerde client, parser, deelnemersbron, private mapping en resultaattekst. `worker/slack/login.ts` doet de inlogflow via `GET /auth/slack/beer` en `GET /auth/slack/callback`; hostcommando's zijn `slackImport` (optioneel permalink, zonder link = refresh), `slackManual`, `slackRetry`. Ook gemanipuleerde spectatorrequests worden afgewezen. Spectator-DTO's bevatten geen Slack-metadata. De raderen/selectie zijn ongewijzigd en blijven zonder netwerk of Slack functioneren.
 
 ## Koffierad ☕
 
 Naast Bierrad is er **Koffierad: wie haalt de volgende koffie?** Kies bovenaan je variant of open de site met `#/coffee` (bier: `#/beer`; de bestaande lege route blijft Bierrad). Beide gebruiken dezelfde radlogica. Koffie heeft warme crème-/espressokleuren en eigen teksten en een apart opgeslagen deelnemerslijst voor handmatig herstel. Beide varianten starten leeg met de standaard aantalvoorkeur. Wisselen start een lokale variant; tijdens draaien is de wissel geblokkeerd. Er is geen permanente uitslaghistorie.
 
-De variant van een live-sessie staat vanaf creatie vast op de server; host en kijkers ontvangen hetzelfde thema. Oude sessies en links blijven bier. `POST /api/sessions` accepteert `{}` voor bier of een body met uitsluitend `variant`, met waarde `beer` of `coffee`. Koffie krijgt een **eigen Slack-app** met eigen servercredentials, eigen inloggen, `:coffee:`-reacties en koffie-uitslagen. Zie [Koffierad instellen](docs/slack-setup.md#aparte-koffierad-app).
+De variant van een live-sessie staat vanaf creatie vast op de server; host en kijkers ontvangen hetzelfde thema. Oude sessies en links blijven bier. `POST /api/sessions` accepteert `{}` voor bier of een body met uitsluitend `variant`, met waarde `beer` of `coffee`. Koffie krijgt een **eigen Slack-app** met eigen servercredentials, `:coffee:`-reacties en koffie-uitslagen. **Start met Slack** (een vrijdagbericht koppelen) is er alleen voor het Bierrad; het Koffierad gaat uitsluitend via [een gekoppeld kanaal](#live-koffierad-per-slack-kanaal) en `/koffierad`. Oude links naar `#/coffee-slack` openen het Koffierad. Zie [Koffierad instellen](docs/slack-setup.md#aparte-koffierad-app).
 
 ### Live Koffierad per Slack-kanaal
 
@@ -209,9 +209,9 @@ Iedere afdeling kan een eigen Koffierad aan een eigen Slack-kanaal koppelen via 
 
 ## Waterrad 💧
 
-Het derde rad: **wie haalt het water voor de afdeling?** Open `#/water` of kies 💧 Waterrad in de wissel bovenaan. Alles werkt zoals bij koffie (lokaal, live, Start met Slack via `#/water-slack`, plannen en kijklinks), met blauwe/aqua kleuren, een eigen icoon en eigen teksten ("Rondje gemeentepils van de zaak! Hydrateer ons trots."). `POST /api/sessions` accepteert ook `variant: "water"`. Water gebruikt bewust **dezelfde Slack-app als koffie** (geen nieuwe app of secrets) en telt uitsluitend **💧 `:droplet:`**-reacties. Zie [Waterrad in Slack](docs/slack-setup.md#waterrad).
+Het derde rad: **wie haalt het water voor de afdeling?** Het Waterrad bestaat alleen als ronde van een aan een kanaal gekoppeld Koffierad: typ `/waterrad` (of `/waterrad 10`) in het kanaal. Het staat niet in de wissel bovenaan, er is geen lokaal Waterrad en geen Start met Slack; oude links naar `#/water` en `#/water-slack` openen het Koffierad, en `POST /api/sessions` weigert `variant: "water"`. Een waterronde heeft blauwe/aqua kleuren, een eigen icoon en eigen teksten ("Rondje gemeentepils van de zaak! Hydrateer ons trots."), gebruikt bewust **dezelfde Slack-app als koffie** (geen nieuwe app of secrets) en telt uitsluitend **💧 `:droplet:`**-reacties.
 
-Een aan een kanaal gekoppeld Koffierad doet ook waterrondes: typ `/waterrad` (of `/waterrad 10`) in het kanaal. Het is dezelfde koppeling met dezelfde links; het vaste kanaalrad en de meekijklink kleuren automatisch mee met de ronde (blauw bij water, bruin bij koffie). Per kanaal loopt één ronde tegelijk, koffie of water, met samen maximaal 25 per 24 uur. Zie [waterrondes toevoegen](docs/slack-setup.md#waterrondes-toevoegen-waterrad).
+ Het is dezelfde koppeling met dezelfde links; het vaste kanaalrad en de meekijklink kleuren automatisch mee met de ronde (blauw bij water, bruin bij koffie). Per kanaal loopt één ronde tegelijk, koffie of water, met samen maximaal 25 per 24 uur. Zie [waterrondes toevoegen](docs/slack-setup.md#waterrondes-toevoegen-waterrad).
 
 ## Linkvoorbeelden
 

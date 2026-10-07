@@ -2,8 +2,9 @@ import { VariantContext, useTheme } from "./Theme";
 import {
   localHash,
   localVariant,
+  retiredRoute,
+  startsWithSlack,
   themes,
-  wheelVariants,
   type WheelVariant,
 } from "../shared/variant";
 import { useEffect, useState, useSyncExternalStore } from "react";
@@ -39,6 +40,13 @@ export function SessionRoot() {
     window.addEventListener("hashchange", change);
     return () => window.removeEventListener("hashchange", change);
   }, []);
+  const retired = retiredRoute(hash);
+  useEffect(() => {
+    if (!retired) return;
+    history.replaceState(null, "", retired);
+    setHash(retired);
+  }, [retired]);
+  if (retired) return null;
   const join = parseJoinRoute(hash);
   if (join)
     return join.page === "failure" ? (
@@ -219,7 +227,7 @@ function LiveBar({
           Start live {theme.name} ↗
         </button>
       )}
-      {!live && apiUrl && (
+      {!live && apiUrl && startsWithSlack(theme.variant) && (
         <a
           className="button-link"
           href={slackLoginUrl(apiUrl, theme.variant)}
@@ -289,21 +297,16 @@ const failures: Record<SlackFailure, string> = {
   unavailable: "Slack is nu niet bereikbaar of nog niet ingesteld.",
   busy: "Even rustig aan. Probeer over een minuut opnieuw.",
 };
-/** `#/slack` for beer, `#/<variant>-slack` otherwise, with an optional failure. */
+/** `#/slack` with an optional failure; only the Bierrad starts with Slack. */
 function slackLoginRoute(
   hash: string,
-): { variant: WheelVariant; failure?: SlackFailure } | undefined {
+): { variant: "beer"; failure?: SlackFailure } | undefined {
   const match =
-    /^#\/(?:([a-z]+)-)?slack(?:\/(denied|forbidden|expired|unavailable|busy))?$/.exec(
-      hash,
-    );
+    /^#\/slack(?:\/(denied|forbidden|expired|unavailable|busy))?$/.exec(hash);
   if (!match) return;
-  const variant = match[1] ?? "beer";
-  if (!wheelVariants.includes(variant as WheelVariant) || match[1] === "beer")
-    return;
   return {
-    variant: variant as WheelVariant,
-    ...(match[2] ? { failure: match[2] as SlackFailure } : {}),
+    variant: "beer",
+    ...(match[1] ? { failure: match[1] as SlackFailure } : {}),
   };
 }
 function slackLoginUrl(api: string, variant: WheelVariant): string {
@@ -334,13 +337,6 @@ function SlackLogin({ failure }: { failure?: SlackFailure }) {
         >
           Log in met Slack {theme.icon}
         </a>
-      )}
-      {isChannelVariant(theme.variant) && (
-        <p>
-          Liever een vast rad voor je afdeling, waar iedereen een koffie- of
-          waterronde kan aanvragen?{" "}
-          <a href="#/koffie-koppelen">Koppel het aan een Slack-kanaal</a>
-        </p>
       )}
       <p>
         <a href={localHash(theme.variant)}>Liever handmatig draaien</a>

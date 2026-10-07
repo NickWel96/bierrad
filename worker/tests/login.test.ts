@@ -108,7 +108,7 @@ test("login start sends only public OIDC parameters and a host-only short-lived 
       beginLogin({ ...env, SLACK_CLIENT_SECRET: undefined }, "beer", redirect),
     (e: unknown) => e instanceof LoginError && e.reason === "unavailable",
   );
-  const start = beginLogin(env, "coffee", redirect);
+  const start = beginLogin(env, "beer", redirect);
   const url = new URL(start.location);
   assert.equal(
     url.origin + url.pathname,
@@ -122,7 +122,7 @@ test("login start sends only public OIDC parameters and a host-only short-lived 
   assert.ok(!start.location.includes(env.SLACK_CLIENT_SECRET));
   assert.ok(!start.location.includes(env.SLACK_BOT_TOKEN));
   for (const attribute of [
-    `${LOGIN_COOKIE}=coffee.`,
+    `${LOGIN_COOKIE}=beer.`,
     "Path=/",
     "Max-Age=600",
     "HttpOnly",
@@ -132,7 +132,13 @@ test("login start sends only public OIDC parameters and a host-only short-lived 
     assert.ok(start.cookie.includes(attribute));
   assert.ok(!start.cookie.includes("Domain"));
   const pending = parseLoginCookie(start.cookie.split(";")[0]);
-  assert.equal(pending?.variant, "coffee");
+  assert.equal(pending?.variant, "beer");
+  // Only the Bierrad starts with Slack: a plain coffee or water login is refused.
+  for (const other of ["coffee", "water"])
+    assert.equal(
+      parseLoginCookie(start.cookie.split(";")[0].replace("=beer.", `=${other}.`)),
+      undefined,
+    );
   assert.equal(pending?.state, url.searchParams.get("state"));
   assert.equal(pending?.nonce, url.searchParams.get("nonce"));
 });

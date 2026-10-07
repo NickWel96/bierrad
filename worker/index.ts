@@ -1,4 +1,4 @@
-import { isWheelVariant, themes } from "../shared/variant";
+import { isStandaloneVariant, startsWithSlack, themes } from "../shared/variant";
 import type { WheelVariant } from "../shared/variant";
 import type { CreatedSession } from "../shared/protocol";
 import {
@@ -94,8 +94,8 @@ async function slackAuth(
   const callback = `${url.origin}/auth/slack/callback`;
   const pending = parseLoginCookie(request.headers.get("Cookie"));
   const named = /^\/auth\/slack\/([a-z]+)$/.exec(url.pathname);
-  // `callback` and unknown names are not login starts.
-  const start = named && isWheelVariant(named[1]) ? named : null;
+  // `callback`, unknown names and the channel-bound Koffierad are not login starts.
+  const start = named && startsWithSlack(named[1]) ? named : null;
   // Binding a Koffierad to a channel: the channel travels in the login cookie.
   const bindStart = /^\/auth\/slack\/channel\/([CG][A-Z0-9]{8,20})$/.exec(
     url.pathname,
@@ -163,7 +163,8 @@ async function slackAuth(
         const sessionVariant = await env.SESSIONS.getByName(
           capability.locator,
         ).joinLoginAllowed(capability.secret);
-        if (!sessionVariant) return fail("expired");
+        // Only Bierrad sessions started with Slack have join links.
+        if (!startsWithSlack(sessionVariant)) return fail("expired");
         const login = beginLogin(
           slackEnvironment(env, sessionVariant),
           sessionVariant,
@@ -394,11 +395,12 @@ export default {
             typeof body !== "object" ||
             Array.isArray(body) ||
             Object.keys(body).some((key) => key !== "variant") ||
-            ("variant" in body && !isWheelVariant(body.variant))
+            // Water exists only as a channel round, never as an own session.
+            ("variant" in body && !isStandaloneVariant(body.variant))
           )
             throw new RequestError(400, "invalid");
           const variant =
-            "variant" in body && isWheelVariant(body.variant)
+            "variant" in body && isStandaloneVariant(body.variant)
               ? body.variant
               : "beer";
           response = json(await createSession(env, variant), 201);

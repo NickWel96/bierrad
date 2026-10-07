@@ -3,6 +3,22 @@ export const wheelVariants: readonly WheelVariant[] = ["beer", "coffee", "water"
 export function isWheelVariant(value: unknown): value is WheelVariant {
   return (wheelVariants as readonly unknown[]).includes(value);
 }
+/**
+ * Wheels anyone can open on their own: locally, in the switcher and as a plain
+ * live session. Water exists only as a round of a channel-bound Koffierad.
+ */
+export type StandaloneVariant = Extract<WheelVariant, "beer" | "coffee">;
+export const standaloneVariants: readonly StandaloneVariant[] = ["beer", "coffee"];
+export function isStandaloneVariant(value: unknown): value is StandaloneVariant {
+  return (standaloneVariants as readonly unknown[]).includes(value);
+}
+/**
+ * Only the Bierrad starts with Sign in with Slack on a Friday message; the
+ * Koffierad reaches Slack solely through its channel binding.
+ */
+export function startsWithSlack(value: unknown): value is "beer" {
+  return value === "beer";
+}
 /** Slack reactions a variant counts; each variant reads only its own. */
 export type SlackReaction = "beers" | "coffee" | "droplet";
 /** The Slack app whose server-side credentials a variant uses; water shares the Koffierad app. */
@@ -112,10 +128,16 @@ export function localHash(variant: WheelVariant): string {
   return `#/${variant}`;
 }
 /** The local wheel route of a variant, or undefined for any other hash. */
-export function localVariant(hash: string): WheelVariant | undefined {
+export function localVariant(hash: string): StandaloneVariant | undefined {
   if (!hash) return "beer";
   const name = /^#\/([a-z]+)$/.exec(hash)?.[1];
-  return isWheelVariant(name) ? name : undefined;
+  return isStandaloneVariant(name) ? name : undefined;
+}
+/** Old water and Koffierad Slack routes open the Koffierad, so saved links keep working. */
+export function retiredRoute(hash: string): string | undefined {
+  return /^#\/(?:water|(?:water|coffee)-slack(?:\/[a-z]+)?)$/.test(hash)
+    ? localHash("coffee")
+    : undefined;
 }
 /** The variant whose Slack reaction this is; reactions are never shared. */
 export function reactionVariant(reaction: SlackReaction): WheelVariant {

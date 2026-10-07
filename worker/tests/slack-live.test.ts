@@ -8,15 +8,15 @@ import type {
   PublicBeerWheelSession,
 } from "../../shared/protocol";
 
-for (const variant of ["beer", "coffee", "water"] as const)
+// Only the Bierrad starts with Slack; the Koffierad uses its channel binding.
+for (const variant of ["beer"] as const)
   test(
     `${variant} Slack Worker: Sign in with Slack starts, authorization, DTO privacy, refresh, disconnected completion and durable idempotency`,
     { timeout: 50000 },
     async () => {
-      const reaction = { beer: "beers", coffee: "coffee", water: "droplet" }[
+      const reaction = { beer: "beers", coffee: "coffee" }[
         variant
       ];
-      // Water shares the Koffierad app; beer has its own.
       const coffeeApp = variant !== "beer";
       const credential = `synthetic-${variant}-credential`;
       const clientId = "1000000000.2000000000",
@@ -241,6 +241,8 @@ for (const variant of ["beer", "coffee", "water"] as const)
         );
         for (const invalid of [
           { variant: "tea" },
+          // Water is only a channel round, never an own session.
+          { variant: "water" },
           { variant: null },
           { variant, token: "bad" },
         ])
@@ -254,6 +256,13 @@ for (const variant of ["beer", "coffee", "water"] as const)
             redirect: "manual",
             headers: cookie ? { Cookie: cookie } : {},
           });
+        // Coffee and water have no Sign in with Slack start: no Slack redirect, no login cookie.
+        for (const other of ["coffee", "water"]) {
+          const refused = await navigate(`/auth/slack/${other}`);
+          assert.equal(refused.status, 303);
+          assert.match(refused.headers.get("location")!, /#\/slack\/expired$/);
+          assert.match(refused.headers.get("set-cookie") ?? "", /Max-Age=0/);
+        }
         const login = async () => {
           const begin = await navigate(`/auth/slack/${variant}`);
           assert.equal(begin.status, 303);
@@ -552,7 +561,7 @@ for (const variant of ["beer", "coffee", "water"] as const)
         );
         assert.ok(
           String(sent[0].text).startsWith(
-            { beer: "🍻", coffee: "☕", water: "💧" }[variant],
+            { beer: "🍻", coffee: "☕" }[variant],
           ),
         );
         assert.equal(sent[0].thread_ts, "1234567890.123456");
